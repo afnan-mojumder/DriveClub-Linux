@@ -1,0 +1,18 @@
+[submodule "runtime-linux/gpu/third_party/fsr-vulkan"]
+	path = runtime-linux/gpu/third_party/fsr-vulkan
+	url = https://github.com/FireBurn/FSR-Vulkan.git
+[submodule "runtime-linux/gpu/third_party/imgui"]
+	path = runtime-linux/gpu/third_party/imgui
+	url = https://github.com/ocornut/imgui.git
+[submodule "runtime-linux/third_party/LibAtrac9"]
+	path = runtime-linux/third_party/LibAtrac9
+	url = https://github.com/Thealexbarney/LibAtrac9.git
+[submodule "runtime-linux/gpu/third_party/magic_enum"]
+	path = runtime-linux/gpu/third_party/magic_enum
+	url = https://github.com/Neargye/magic_enum.git
+[submodule "runtime-linux/gpu/third_party/miniz"]
+	path = runtime-linux/gpu/third_party/miniz
+	url = https://github.com/richgel999/miniz.git
+[submodule "runtime-linux/gpu/third_party/xbyak"]
+	path = runtime-linux/gpu/third_party/xbyak
+	url = https://github.com/herumi/xbyak.git

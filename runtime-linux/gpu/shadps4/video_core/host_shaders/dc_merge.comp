@@ -1,0 +1,31 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Driveclub: the upscaled scene back into the game's R11G11B10 scene color, stored as the
+// color block would (negatives and NaN as 0, overflow as the largest finite value).
+#version 450
+#extension GL_EXT_samplerless_texture_functions : require
+
+layout(local_size_x = 8, local_size_y = 8) in;
+
+layout(binding = 0) uniform texture2D upscaled;
+layout(binding = 1) uniform writeonly image2D scene_img;
+layout(binding = 2) uniform texture2D motion_tex; // pixels, previous - current
+
+layout(push_constant) uniform Constants {
+    uvec2 size;
+    uint mode; // 0 upscaled scene, 1 motion vectors (BB_DC_DEBUG_MOTION=1)
+};
+
+void main() {
+    const ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
+    if (any(greaterThanEqual(uvec2(pixel), size))) {
+        return;
+    }
+    vec3 color = texelFetch(upscaled, pixel, 0).rgb;
+    if (mode == 1u) {
+        // Motion: red right, green down, blue its length; 0.5 is still (16 px full scale).
+        const vec2 m = texelFetch(motion_tex, pixel, 0).xy;
+        color = vec3(0.5 + m / 32.0, length(m) / 16.0) * 0.5;
+    }
+    const vec3 stored = mix(vec3(0.0), min(color, vec3(65024.0)), greaterThan(color, vec3(0.0)));
+    imageStore(scene_img, pixel, vec4(stored, 1.0));
+}

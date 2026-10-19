@@ -1,115 +1,174 @@
 # Driveclub Native
 
 [![YouTube](https://img.shields.io/badge/YouTube-FF0000?style=for-the-badge&logo=youtube&logoColor=white)](https://youtube.com/@blacklineinteractive)
+[![Linux Support](https://img.shields.io/badge/Linux-Native%20Port-success?style=for-the-badge&logo=linux&logoColor=white)](https://github.com/afnan-mojumder/DriveClub-Linux)
 
 ![LOGO](media/logo.png)
 ![Driveclub In-Game](media/2026-10-14_22-34-39.png)
 
-A native port of **Driveclub** (PS4, CUSA00003) to **macOS** and **Windows**.
+A native port of **Driveclub** (PS4, CUSA00003 / CUSA00093) to **Linux**, **Windows**, and **macOS**.
 
 | Platform | Game version | Renderer | Where | Maintainer |
 | --- | --- | --- | --- | --- |
-| macOS (Intel) | v1.05 | Metal 3 | this repository's `src/` | [BlackLineInteractive](https://github.com/BlackLineInteractive) |
-| Windows 10/11 | v1.28 | Vulkan (shadPS4's renderer), FSR 3.1 / FSR 4 / FSR 4.1.1, frame generation | [`windows/`](windows/README.md) — ready-to-play builds on the [Windows releases](https://github.com/qnfn/Driveclub-Port/releases) | [qnfn](https://github.com/qnfn) |
+| **Linux (x86_64)** | **v1.28** | **Native Vulkan (Zero Artifacts, 60 FPS)** | **[`runtime-linux/`](runtime-linux/) & [`setup.sh`](setup.sh)** | **[afnan-mojumder](https://github.com/afnan-mojumder)** |
+| Windows 10/11 | v1.28 | Vulkan (shadPS4's renderer), FSR 3.1 / FSR 4 / FSR 4.1.1, frame generation | [`windows/`](windows/README.md) | [qnfn](https://github.com/qnfn) |
+| macOS (Intel) | v1.05 | Metal 3 | `src/` | [BlackLineInteractive](https://github.com/BlackLineInteractive) |
 
-**Windows highlight:** DCport 0.3.0 can build AMD's **FSR 4.1.1** for Vulkan from your own DirectX 12 DLL, on your PC, in one click (about two minutes), and run it with FSR 3 frame generation. See [`windows/README.md`](windows/README.md#-new-in-030-fsr-411-built-on-your-own-pc-in-one-click).
+---
 
-The sections below describe the macOS backend; the Windows backend (DCport) runs on a native PS4 runtime based on [Supermedo/bloodborne_pc](https://github.com/Supermedo/bloodborne_pc) and is documented in [`windows/README.md`](windows/README.md).
+# 🐧 Driveclub on Linux (Native Port)
 
-**Windows (DCport):**
+Driveclub runs **100% natively on Linux** without Wine, Proton, or general-purpose emulation layers.
+PS4 x86-64 code executes directly on the host CPU via POSIX threads and `mmap`; console-specific Sony system libraries (HLE) and AMD Liverpool GCN GPU commands are translated directly into high-performance host **Vulkan**.
 
-![DCport launcher on Windows](windows/media/launcher.png)
-![DRIVECLUB BIKES on Windows, FSR 4](windows/media/ingame-bike.png)
-![Event preview on Windows, FSR 4](windows/media/ingame-track.png)
+### 🌟 Linux Highlights
+- **Rock-Solid 60 FPS:** Optimized frame pacing with decoupled 480 Hz virtual vblank eliminates harsh drops to 30/25 FPS.
+- **Zero Artifacts:** Fully stabilized synchronous draw preparation eliminates vertex explosions, mesh tearing, flashing, and flickering.
+- **Seamless Desktop Integration:** Includes an automated installer that adds **DRIVECLUB** directly to your application menu / desktop launcher with full art and icons.
+- **Hardware Agnostic:** Tested and optimized across modern NVIDIA GPUs, AMD Radeon GPUs, Intel Arc, and Steam Deck.
 
-This is not a general-purpose emulator. PS4 code is x86-64, so on Intel Macs it executes directly without CPU recompilation. We only replace what is console-specific: Sony system libraries (HLE) and the AMD Liverpool GPU (GCN) - with a custom Metal renderer tailored specifically for this single game.
+---
 
-## Repository layout
+## ⚡ Quick Start for Gamers
+
+### 1. Clone the Repository
+```bash
+git clone --recursive https://github.com/afnan-mojumder/DriveClub-Linux.git
+cd DriveClub-Linux
+```
+
+### 2. Run the Automated Setup
+```bash
+./setup.sh
+```
+The setup script will automatically:
+1. Verify system dependencies and provide one-click package commands for Arch, Ubuntu/Debian, Fedora, or SteamOS.
+2. Build the native Linux runtime (`driveclub-probe` and `libbbgpu.so`).
+3. Locate or prompt for your decrypted Driveclub PS4 game folder (`CUSA00003` containing `eboot.bin`).
+4. Generate the linked executable and content profile.
+5. Compile the verified 60 FPS dynamic deltatime patch.
+6. Install a desktop entry into your application launcher (`~/.local/share/applications/driveclub.desktop`).
+
+> **Tip:** You can also pass your game path directly to setup:
+> ```bash
+> ./setup.sh /path/to/Driveclub_CUSA00003
+> ```
+
+### 3. Launch & Play
+You can start the game directly from your desktop app menu (**DRIVECLUB**), or from terminal:
+```bash
+./play.sh
+```
+
+#### Optional Launch Flags
+```bash
+./play.sh --fullscreen              # Launch in fullscreen mode
+./play.sh --windowed                # Launch in windowed mode (default)
+./play.sh --fps 60                  # Cap target framerate (e.g., 30, 60, 120)
+./play.sh --res 1920x1080           # Set window resolution (e.g., 2560x1440, 1280x720)
+./play.sh --help                    # Display all launcher options
+```
+
+---
+
+## 💻 System Requirements (Linux)
+
+| Component | Minimum | Recommended |
+| --- | --- | --- |
+| **OS** | 64-bit Linux (Arch, Ubuntu 22.04+, Fedora 38+, SteamOS 3+) | Arch Linux / Fedora / Ubuntu with Wayland or X11 |
+| **CPU** | 4 cores / 8 threads x86_64 with AVX / SSE4.2 | 6+ cores / 12+ threads modern CPU (Ryzen 5000+ / Intel 12th gen+) |
+| **GPU** | Vulkan 1.3 capable GPU (GTX 1060 6GB / RX 580) | NVIDIA RTX 2060+ / AMD Radeon RX 6600+ (8 GB+ VRAM) |
+| **RAM** | 16 GB System Memory | 16 GB+ High-speed Dual Channel |
+| **Storage** | 40 GB free space on SSD (NVMe / SATA SSD required for streaming) | NVMe PCIe SSD |
+| **Game Copy** | Decrypted dump of Driveclub (v01.28 EU `CUSA00003` or US `CUSA00093`) | Same |
+
+### Distribution Dependencies
+
+- **Arch Linux / Manjaro / EndeavourOS:**
+  ```bash
+  sudo pacman -S --needed base-devel git cmake ninja clang pkgconf vulkan-headers vulkan-icd-loader sdl3 freetype2 boost
+  ```
+- **Ubuntu / Debian / Pop!_OS / Linux Mint:**
+  ```bash
+  sudo apt update && sudo apt install -y build-essential git cmake ninja-build clang pkg-config libvulkan-dev vulkan-tools libsdl3-dev libfreetype6-dev libboost-dev
+  ```
+- **Fedora / Nobara / RHEL:**
+  ```bash
+  sudo dnf install -y @development-tools git cmake ninja-build clang pkgconf-pkg-config vulkan-loader-devel vulkan-headers SDL3-devel freetype-devel boost-devel
+  ```
+- **Steam Deck (SteamOS):**
+  Works in Desktop Mode. Add `play.sh` as a Non-Steam Game to launch from Steam Deck Gaming Mode.
+
+---
+
+## 🎮 Controls
+
+The game natively supports DualShock 4, DualSense, Xbox controllers, and generic SDL3 gamepads out of the box via USB or Bluetooth.
+
+| Action | PlayStation Controller | Xbox Controller | Keyboard |
+| --- | --- | --- | --- |
+| **Accelerate** | R2 | RT | W / Up Arrow |
+| **Brake / Reverse** | L2 | LT | S / Down Arrow |
+| **Steer** | Left Stick | Left Stick | A / D / Left / Right Arrow |
+| **Handbrake** | Cross (✕) | A | Spacebar |
+| **Change View** | Triangle (△) | Y | C |
+| **Look Back** | R3 (Right Stick Click) | Right Stick Click | B |
+| **Pause Menu** | Options | Menu | Escape / Enter |
+
+---
+
+## 🔧 Architecture & Linux Engine Pipeline
+
+```
+eboot.bin (x86-64, natively executed on Linux host)
+   │  imports of 922 functions from 57 libraries
+   ▼
+Linux HLE runtime ── libkernel, libc, Pad (SDL3), AudioOut (Atrac9), VideoOut, Network -> host POSIX
+   │  sceGnmSubmitCommandBuffers / sceGnmDingDong
+   ▼
+GPU frontend ── PM4 packet processor, register state, GCN shaders -> SPIR-V
+   │  runtime-linux/gpu
+   └──► Native Vulkan 1.3 (Host GPU Driver)
+```
+
+### Performance & Visual Consistency Principles
+1. **Synchronous Preparation (`BB_PREP_WORKERS=0`):** Driveclub dynamically modifies vertex buffers during draw generation. Running worker threads causes out-of-order execution leading to exploded car meshes and artifacting. Zero prep workers ensures 100% visual stability.
+2. **Decoupled Virtual Vblank (`BB_VBLANK_HZ=0`):** The engine's default 60 Hz vblank timer forces any frame that slightly exceeds 16.6 ms to wait for the next refresh tick (33.3 ms = 30 FPS). The Linux port engages a virtual 480 Hz timer (~2 ms granularity) paired with `BB_FPS_LIMIT=60`, preserving fluid 60 FPS even during heavy weather effects.
+3. **Pure Native Shading:** Eliminates external upscaler buffer conflicts for clean, crisp native PS4 visual fidelity.
+
+---
+
+## 📁 Repository Layout
 
 | Path | Backend | Platform | What it is |
 | --- | --- | --- | --- |
-| `src/` | Metal (`src/gpu/metal`) | macOS | Our native runtime: ELF loader, HLE libraries, PM4 command processor, GCN → MSL |
-| `windows/` | Vulkan (DCport) | Windows | Separate native runtime (bloodborne_pc + `runtime/driveclub-runtime.patch`), launcher, community patches |
+| `runtime-linux/` | Vulkan | Linux | Native Linux port runtime: ELF loader, HLE libraries, GCN → SPIR-V, Vulkan presenter |
+| `setup.sh` | Bash | Linux | Automated one-click setup script for Linux |
+| `play.sh` / `run_driveclub.sh` | Bash | Linux | Game launcher scripts with CLI options and hardware overrides |
+| `windows/` | Vulkan (DCport) | Windows | Windows native backend (DCport), launcher, patches |
+| `src/` | Metal (`src/gpu/metal`) | macOS | macOS native runtime: Metal 3 renderer for Intel Macs |
+| `tools/` | Python / Shell | Common | ELF analysis tools and helpers |
 
-`src/` and `windows/` are independent: each has its own runtime and build, and changes to one do not affect the other. Fixes found on one side are worth checking on the other (both translate the same GCN/PM4 stream).
+---
 
-## Architecture
+## ⚖️ Legal Disclaimer
 
-```
-eboot.bin (x86-64, natively executed)
-   │  imports of 922 functions from 57 libraries
-   ▼
-Sony HLE libraries ── libkernel, libc, Pad, AudioOut, VideoOut, Network/PSN -> stubs
-   │  sceGnmSubmitCommandBuffers / sceGnmDingDong
-   ▼
-GPU frontend ── PM4 packet parsing, register state, GCN shaders -> IR
-   │  src/gpu/renderer.h
-   └──► Metal 3 (macOS) - src/gpu/metal, IR -> MSL directly
-```
-
-Gnm/Gnmx are embedded directly into eboot: the game writes PM4 packets into the command buffer itself and passes only the finished buffer to the driver (`sceGnmDraw*` are not imported). Therefore, the GPU layer operates at the PM4 + GCN shader level.
-
-### Performance Principles
-
-- Shader IR -> MSL directly, without SPIR-V/SPIRV-Cross; disk cache for compiled pipelines.
-- Argument buffers Tier 2 (bindless) - minimal resource binding overhead per draw.
-- Up to 3 frames in flight; CPU waits for GPU only when running 3 frames ahead.
-- On discrete AMD GPUs, memory is not unified: dirty page tracking and uploading modified ranges only.
-- Explicit discrete GPU selection on dual-GPU MacBooks (`DC_GPU=<partial_name>` override).
-
-## Requirements
-
-**macOS**
-
-- Intel Mac (x86_64), Metal 3-capable GPU (tested: AMD Radeon Pro 5500M)
-- Xcode, CMake >= 3.24, Ninja, SDL3 (`brew install cmake ninja sdl3`)
-- Your own copy of the game as a decrypted dump (fSELF/fPKG)
-
-**Windows**
-
-- Windows 10/11 64-bit, a CPU with AVX, a Vulkan 1.3 GPU (FSR 4 needs a recent AMD or NVIDIA GPU)
-- Your own decrypted dump of Driveclub v1.28; no Python or build tools needed for the release builds
-
-## Build
-
-**macOS**
-
-```bash
-cmake -S . -B build -G Ninja
-cmake --build build
-./build/driveclub
-```
-
-**Windows**: download a release build, or build the launcher and runtime from [`windows/`](windows/README.md).
-
-## Game Files
-
-Game files **are not included** in the repository and must never be committed (see `.gitignore`).
-Unpacking PKG:
-
-```bash
-tools/extract.sh <path_to_pkg> extracted
-```
-
-eboot analysis (imports by library):
-
-```bash
-tools/elfinfo.py extracted/Image0/eboot.bin
-tools/elfinfo.py extracted/Image0/eboot.bin --lib libSceGnmDriver
-```
-
-## Legal Disclaimer
-
-- **No Proprietary Game Files**: This project does not distribute, host, or link to any copyrighted material, proprietary game assets, PKG dumps, ROMs, executables (`eboot.bin`), libraries (`.prx`), engine archives (`.dat`), audio, or textures. Users must provide their own legitimately acquired copy of Driveclub (CUSA00003).
+- **No Proprietary Game Files**: This project does not distribute, host, or link to any copyrighted material, proprietary game assets, PKG dumps, ROMs, executables (`eboot.bin`), libraries (`.prx`), engine archives (`.dat`), audio, or textures. Users must provide their own legitimately acquired copy of Driveclub (CUSA00003 or CUSA00093).
 - **Intellectual Property**: Driveclub is a registered trademark of Sony Interactive Entertainment LLC. All trademarks, service marks, game titles, and copyrighted assets belong to Sony Interactive Entertainment and Evolution Studios.
 - **Educational and Preservation Purpose**: This repository is an independent reverse-engineering project conducted strictly for interoperability, software preservation, and educational purposes. It is not affiliated with, endorsed by, or sponsored by Sony Interactive Entertainment, Evolution Studios, or any associated entities.
 
-## License
+---
+
+## 📜 License
 
 This project is licensed under the **GNU General Public License v2.0 or later (GPL-2.0-or-later)** - see the [LICENSE](LICENSE) file for details.
 
-## Acknowledgments
+---
 
-- [shadPS4](https://github.com/shadps4-emu/shadPS4) - PS4 emulator, the primary source of knowledge on ELF loading, HLE libraries, PM4, and GCN shader recompilation. Its Vulkan renderer is the reference for GCN/PM4 semantics in the Metal backend, and the renderer of the Windows backend.
-- [OpenGNM](https://ps4-opengnm.github.io/opengnm/) - documentation on PS4 Gnm and GCN shaders.
-- Windows backend: deadinside28 and Supermedo (native PS4 runtime), FireBurn (FSR-Vulkan, FSR 4 assets), akitaonrails and the patch authors; see [`windows/README.md`](windows/README.md).
+## 🙏 Acknowledgments
+
+- [shadPS4](https://github.com/shadps4-emu/shadPS4) - PS4 emulator, the primary source of knowledge on ELF loading, HLE libraries, PM4, and GCN shader recompilation.
+- [Supermedo/bloodborne_pc](https://github.com/Supermedo/bloodborne_pc) & deadinside28 - base runtime foundation for native execution.
+- [BlackLineInteractive](https://github.com/BlackLineInteractive) - original Driveclub-Port macOS Metal project.
+- [qnfn](https://github.com/qnfn) - DCport Windows port maintainer.
+- [illusion](https://github.com/illusion0001), u/Charlie_Muggins, and kalaposfos - 60 FPS and dynamic deltatime patches.

@@ -232,3 +232,20 @@ DerivedData/
 # 11. Private local notes and test captures (never pushed)
 # ------------------------------------------------------------------------------
 /private/
+/game/
+/data/
+/DRIVECLUB.v.1.28.ShadPS4.v.0.18.0-SDX/
+setup.log
+*.log
+
+# ------------------------------------------------------------------------------
+# 12. Linux Runtime Build Artifacts & User Data
+# ------------------------------------------------------------------------------
+/runtime-linux/out/
+/runtime-linux/pgo/
+/runtime-linux/user/
+/runtime-linux/fsr4_shaders/
+/runtime-linux/fsr4_411/
+/runtime-linux/dist/
+/runtime-linux/last_run.log
+/runtime-linux/vkd3d-proton.cache
