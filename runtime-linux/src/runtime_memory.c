@@ -88,7 +88,7 @@ typedef void (*GpuRange)(uintptr_t address, uint64_t size);
 static GpuRange hook_map, hook_unmap, hook_invalidate;
 enum { HOOK_MAP, HOOK_UNMAP, HOOK_INVALIDATE };
 typedef struct { int kind; uintptr_t address; uint64_t size; } PendingHook;
-static PendingHook pending[64]; static size_t pending_count;
+static PendingHook *pending; static size_t pending_count, pending_capacity;
 static size_t allocations, maps, flexible_maps, protects, queries;
 static uint64_t live_bytes, flexible_bytes;
 
@@ -268,19 +268,35 @@ static void host_discard(uint64_t phys, uint64_t size) {
 static void queue_hook(int kind, uintptr_t address, uint64_t size) {
     GpuRange hook = kind==HOOK_MAP ? hook_map : kind==HOOK_UNMAP ? hook_unmap : hook_invalidate;
     if (!hook) return;
-    if (pending_count==sizeof(pending)/sizeof(*pending)) { fputs("STOP: GPU hook queue overflow\n",stderr); exit(21); }
-    pending[pending_count++]=(PendingHook){kind,address,size};
+    if (pending_count == pending_capacity) {
+        size_t cap = pending_capacity ? pending_capacity * 2 : 128;
+        PendingHook *next = realloc(pending, cap * sizeof(*pending));
+        if (!next) {
+            fputs("Runtime: failed to grow GPU hook queue\n", stderr);
+            return;
+        }
+        pending = next;
+        pending_capacity = cap;
+    }
+    pending[pending_count++] = (PendingHook){kind, address, size};
 }
 /* Runs queued GPU notifications; callers invoke it after dropping the lock. */
 static void flush_hooks(void) {
     for (;;) {
         write_lock();
         if (!pending_count) { write_unlock(); return; }
-        PendingHook h=pending[0];
-        memmove(pending,pending+1,--pending_count*sizeof(*pending));
-        GpuRange hook = h.kind==HOOK_MAP ? hook_map : h.kind==HOOK_UNMAP ? hook_unmap : hook_invalidate;
+        PendingHook *batch = pending;
+        size_t count = pending_count;
+        pending = NULL;
+        pending_count = 0;
+        pending_capacity = 0;
         write_unlock();
-        if (hook) hook(h.address,h.size);
+
+        for (size_t i = 0; i < count; ++i) {
+            GpuRange hook = batch[i].kind==HOOK_MAP ? hook_map : batch[i].kind==HOOK_UNMAP ? hook_unmap : hook_invalidate;
+            if (hook) hook(batch[i].address, batch[i].size);
+        }
+        free(batch);
     }
 }
 static int flex_test(uint64_t page) { return (int)((flex_bitmap[page/64]>>(page%64))&1); }

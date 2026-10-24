@@ -114,6 +114,13 @@ static GuestThread *new_thread(void) {
 static void publish(GuestThread *t) {
     pthread_mutex_lock(&lock); t->next=threads; threads=t; pthread_mutex_unlock(&lock);
 }
+static void unpublish(GuestThread *t) {
+    pthread_mutex_lock(&lock);
+    for (GuestThread **link=&threads; *link; link=&(*link)->next) {
+        if (*link==t) { *link=t->next; break; }
+    }
+    pthread_mutex_unlock(&lock);
+}
 /* Host threads that call into guest code without being created by the guest
  * (the main thread, test threads) get a record on first use. */
 GuestThread *runtime_thread_current(void) {
@@ -289,7 +296,13 @@ static int32_t create(GuestThread **out,ThreadAttr **attr_slot,GuestEntry entry,
     *out=t;
     int e=pthread_create(&t->host,&host,host_start,t);
     pthread_attr_destroy(&host);
-    if (e) { fprintf(stderr,"STOP: host pthread_create failed: %d\n",e); exit(21); }
+    if (e) {
+        fprintf(stderr,"Runtime: host pthread_create failed: %d\n",e);
+        unpublish(t);
+        free(t);
+        *out=NULL;
+        return ERR(e);
+    }
     if (t->detached) pthread_detach(t->host);
     pthread_mutex_lock(&lock); ++created; pthread_mutex_unlock(&lock);
     printf("Runtime: guest thread '%s' created (stack=%llu, prio=%d)\n",t->name,(unsigned long long)stack,t->attr.prio);
@@ -305,7 +318,7 @@ static ABI int32_t thread_join(GuestThread *t,void **result) {
     t->joined=1;
     void *value=NULL;
     int e=pthread_join(t->host,&value);
-    if (e) { fprintf(stderr,"STOP: host pthread_join failed: %d\n",e); exit(21); }
+    if (e) { fprintf(stderr,"Runtime: host pthread_join failed: %d\n",e); return ERR(e); }
     if (result) *result=t->result;
     pthread_mutex_lock(&lock); ++joined_count; pthread_mutex_unlock(&lock);
     return 0;

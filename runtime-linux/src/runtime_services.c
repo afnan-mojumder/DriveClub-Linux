@@ -90,9 +90,15 @@ static ABI int32_t system_param(int32_t id,int32_t *value) {
     case 4: { time_t now=time(NULL); struct tm t; localtime_r(&now,&t); *value=(int32_t)(t.tm_gmtoff/60); break; }
 #endif
     case 5: *value=0; break;                    /* summer time */
+    case 6: *value=1; break;                    /* time format (0=12-hour, 1=24-hour) */
     case 7: *value=0; break;                    /* parental level off */
+    case 8: *value=0; break;                    /* parental level age */
+    case 9: *value=0; break;                    /* game parental level */
     case 1000: *value=1; break;                 /* enter button = cross */
-    default: fprintf(stderr,"STOP: unsupported system parameter %d\n",id); exit(21);
+    default:
+        fprintf(stderr,"Runtime: unhandled system parameter %d, defaulting to 0\n",id);
+        *value=0;
+        return 0;
     }
     return 0;
 }

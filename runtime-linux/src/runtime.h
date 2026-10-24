@@ -1,5 +1,8 @@
 #ifndef BB_RUNTIME_H
 #define BB_RUNTIME_H
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
 #include <stdint.h>
 #include <stddef.h>
 #ifdef _WIN32

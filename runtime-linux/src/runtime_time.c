@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
+#include <time.h>
 typedef struct { int64_t seconds, microseconds; } GuestTimeval;
 typedef struct { int32_t minuteswest, dsttime; } GuestTimezone;
 static ABI int guest_gettimeofday(GuestTimeval *value,GuestTimezone *zone) {
@@ -13,12 +14,17 @@ static ABI int guest_gettimeofday(GuestTimeval *value,GuestTimezone *zone) {
     if (gettimeofday(&t,NULL)) { perror("STOP: host gettimeofday failed"); exit(21); }
     if (zone) { zone->minuteswest=(int32_t)(-compat_utc_offset((time_t)t.tv_sec)/60); zone->dsttime=0; }
 #else
-    struct timezone z;
-    if (gettimeofday(&t,&z)) {
-        /* Guest errno/TLS failure path is not implemented yet. */
-        perror("STOP: host gettimeofday failed"); exit(21);
+    if (gettimeofday(&t,NULL)) {
+        perror("Runtime: host gettimeofday failed");
+        return -1;
     }
-    if (zone) { zone->minuteswest=z.tz_minuteswest; zone->dsttime=z.tz_dsttime; }
+    if (zone) {
+        time_t sec=t.tv_sec;
+        struct tm tm_val;
+        localtime_r(&sec,&tm_val);
+        zone->minuteswest=(int32_t)(-tm_val.tm_gmtoff/60);
+        zone->dsttime=tm_val.tm_isdst;
+    }
 #endif
     if (value) { value->seconds=t.tv_sec; value->microseconds=t.tv_usec; }
     return 0;

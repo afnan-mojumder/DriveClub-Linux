@@ -161,8 +161,8 @@ fi
 exec "$PROBE_BIN" \
     "$DATA_DIR/boot-linked.bin" \
     --content-profile "$DATA_DIR/content.bin" \
-    "${PATCHES_ARG[@]}" \
+    ${PATCHES_ARG[@]+"${PATCHES_ARG[@]}"} \
     --app0 "$GAME_DIR" \
     --user "$DATA_DIR/user" \
     --timeout 0 \
-    "${EXTRA_ARGS[@]}"
+    ${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}

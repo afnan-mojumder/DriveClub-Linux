@@ -145,11 +145,49 @@ static ABI int32_t open_font_memory(void *lib, const void *data, uint32_t size, 
     return 0;
 }
 
-/* System font sets: the closest Windows font. */
+/* System font sets: search Linux system fonts, user override (BB_SYSTEM_FONT), and Windows fallback. */
 static ABI int32_t open_font_set(void *lib, uint32_t type, uint32_t mode, const void *params, Font **out) {
     (void)lib, (void)mode, (void)params;
     if (!out) return FONT_ERROR_INVALID_PARAMETER;
-    static const char *const candidates[] = {"C:\\Windows\\Fonts\\segoeui.ttf", "C:\\Windows\\Fonts\\arial.ttf"};
+    static const char *const candidates[] = {
+        "/usr/share/fonts/Adwaita/AdwaitaSans-Regular.ttf",
+        "/usr/share/fonts/noto/NotoSans-Regular.ttf",
+        "/usr/share/fonts/liberation/LiberationSans-Regular.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/dejavu-sans-fonts/DejaVuSans.ttf",
+        "/usr/share/fonts/TTF/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+        "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
+        "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
+        "C:\\Windows\\Fonts\\segoeui.ttf",
+        "C:\\Windows\\Fonts\\arial.ttf",
+    };
+    const char *custom = getenv("BB_SYSTEM_FONT");
+    if (custom && *custom) {
+        FILE *file = fopen(custom, "rb");
+        if (file) {
+            fseek(file, 0, SEEK_END);
+            long size = ftell(file);
+            fseek(file, 0, SEEK_SET);
+            void *data = size > 0 ? malloc((size_t)size) : NULL;
+            size_t read = data ? fread(data, 1, (size_t)size, file) : 0;
+            fclose(file);
+            if (read == (size_t)size && data) {
+                pthread_mutex_lock(&lock);
+                Font *f = open_font(data, read, "system font set");
+                pthread_mutex_unlock(&lock);
+                free(data);
+                if (f) {
+                    printf("Font: system font set 0x%x -> %s\n", type, custom);
+                    *out = f;
+                    return 0;
+                }
+            } else {
+                free(data);
+            }
+        }
+    }
     for (size_t i = 0; i < sizeof(candidates) / sizeof(*candidates); ++i) {
         FILE *file = fopen(candidates[i], "rb");
         if (!file) continue;

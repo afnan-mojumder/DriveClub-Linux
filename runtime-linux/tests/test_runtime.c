@@ -325,6 +325,83 @@ static void rw_timeouts(void) {
     assert(rw_unlock(&f.lock)==0);
     fixture_destroy(&f);
 }
+static void audit_fixes_and_extensions(void) {
+    /* 1. guest_sysctl tests */
+    typedef int32_t (ABI *SysctlFn)(const int32_t *, uint32_t, void *, uint64_t *, const void *, uint64_t);
+    SysctlFn sysctl = GET(SysctlFn, "DFmMT80xcNI#p#J");
+    assert(sysctl);
+
+    int32_t mib_pagesize[] = {6, 7};
+    int32_t pagesize = 0;
+    uint64_t len = sizeof(pagesize);
+    assert(sysctl(mib_pagesize, 2, &pagesize, &len, NULL, 0) == 0);
+    assert(pagesize == 16384 && len == 4);
+
+    int32_t mib_ncpu[] = {6, 3};
+    int32_t ncpu = 0;
+    len = sizeof(ncpu);
+    assert(sysctl(mib_ncpu, 2, &ncpu, &len, NULL, 0) == 0);
+    assert(ncpu == 7 && len == 4);
+
+    int32_t mib_byteorder[] = {6, 4};
+    int32_t byteorder = 0;
+    len = sizeof(byteorder);
+    assert(sysctl(mib_byteorder, 2, &byteorder, &len, NULL, 0) == 0);
+    assert(byteorder == 1234 && len == 4);
+
+    int32_t mib_physmem[] = {6, 5};
+    uint64_t physmem = 0;
+    len = sizeof(physmem);
+    assert(sysctl(mib_physmem, 2, &physmem, &len, NULL, 0) == 0);
+    assert(physmem == (UINT64_C(8) * 1024 * 1024 * 1024) && len == 8);
+
+    int32_t mib_ostype[] = {1, 1};
+    char ostype[32] = {0};
+    len = sizeof(ostype);
+    assert(sysctl(mib_ostype, 2, ostype, &len, NULL, 0) == 0);
+    assert(strcmp(ostype, "FreeBSD") == 0);
+
+    int32_t mib_unknown[] = {99, 99};
+    int32_t dummy = 0;
+    len = sizeof(dummy);
+    assert(sysctl(mib_unknown, 2, &dummy, &len, NULL, 0) == -1);
+    assert(*runtime_errno() == 2 /* ENOENT */);
+
+    /* 2. system_param fallback tests */
+    typedef int32_t (ABI *SysParamFn)(int32_t, int32_t *);
+    SysParamFn sys_param = GET(SysParamFn, "fZo48un7LK4#V#W");
+    assert(sys_param);
+    int32_t val = -1;
+    assert(sys_param(1, &val) == 0 && val >= 1);
+    val = -1;
+    assert(sys_param(6, &val) == 0 && val == 1);
+    val = -1;
+    assert(sys_param(9999, &val) == 0 && val == 0); /* Unknown id defaults to 0 safely without exit(21) */
+
+    /* 3. safe_area stack safety check */
+    typedef int32_t (ABI *SafeAreaFn)(float *);
+    SafeAreaFn safe_area = GET(SafeAreaFn, "1n37q1Bvc5Y");
+    assert(safe_area);
+    struct {
+        float ratio;
+        uint32_t guard_canary;
+    } safe_struct = {0.0f, 0x12345678};
+    assert(safe_area(&safe_struct.ratio) == 0);
+    assert(safe_struct.ratio == 1.0f);
+    assert(safe_struct.guard_canary == 0x12345678); /* No overflow past ratio! */
+
+    /* 4. open_font_set Linux system font resolution check */
+    typedef int32_t (ABI *OpenFontSetFn)(void *, uint32_t, uint32_t, const void *, void **);
+    typedef int32_t (ABI *CloseFontFn)(void *);
+    OpenFontSetFn open_font_set = (OpenFontSetFn)runtime_resolve("cKYtVmeSTcw", 0);
+    CloseFontFn close_font = (CloseFontFn)runtime_resolve("6z0F5m2x7wE", 0);
+    assert(open_font_set);
+    void *font = NULL;
+    int32_t font_ret = open_font_set(NULL, 0, 0, NULL, &font);
+    assert(font_ret == 0);
+    assert(font != NULL);
+    if (close_font) close_font(font);
+}
 int main(int argc,char **argv) {
     runtime_start(0); assert(runtime_resolve("bzQExy189ZI#q#q",0)==0);
     runtime_start(1);
@@ -352,6 +429,7 @@ int main(int argc,char **argv) {
     if (argc>1 && !strcmp(argv[1],"--rwlock-timeouts")) { rw_timeouts(); return 0; }
     libc_support(); posix_mutexes(); wall_time(); exit_handlers(); guards(); mutexes(); direct_memory(); memory_primitives();
     rw_lifecycle(); rw_concurrency(); rw_timeouts();
+    audit_fixes_and_extensions();
     puts("PASS: callback lifecycle, guard ABI, mutex errors, shared direct memory, memory primitives, resolver scope");
     return 0;
 }

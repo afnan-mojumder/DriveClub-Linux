@@ -213,25 +213,67 @@ static ABI int32_t guest_getrusage(int who,GuestRusage *out) {
 static ABI int32_t guest_sysctl(const int32_t *name,uint32_t namelen,void *old,uint64_t *oldlen,const void *new_value,uint64_t newlen) {
     (void)newlen;
     if (!name || namelen<2 || new_value) return fail_posix(EINVAL);
-    if (name[0]==1 && name[1]==37) { /* kern.arandom */
-        if (!old || !oldlen) return fail_posix(EINVAL);
+    /* CTL_KERN */
+    if (name[0]==1) {
+        if (name[1]==37) { /* kern.arandom */
+            if (!old || !oldlen) return fail_posix(EINVAL);
 #ifdef _WIN32
-        if (compat_random(old,(size_t)*oldlen)) return fail_posix(EIO);
+            if (compat_random(old,(size_t)*oldlen)) return fail_posix(EIO);
 #else
-        if (getrandom(old,(size_t)*oldlen,0)<0) return fail_posix(errno);
+            if (getrandom(old,(size_t)*oldlen,0)<0) return fail_posix(errno);
 #endif
-        return 0;
+            return 0;
+        }
+        if (name[1]==24) { /* kern.osreldate (FreeBSD 9.0 = 900044) */
+            if (!oldlen) return fail_posix(EINVAL);
+            int32_t val=900044;
+            if (old) { if (*oldlen<4) return fail_posix(ENOMEM); memcpy(old,&val,4); }
+            *oldlen=4; return 0;
+        }
+        if (name[1]==1) { /* kern.ostype */
+            static const char ostype[]="FreeBSD";
+            if (!oldlen) return fail_posix(EINVAL);
+            if (old) {
+                if (*oldlen<sizeof(ostype)) return fail_posix(ENOMEM);
+                memcpy(old,ostype,sizeof(ostype));
+            }
+            *oldlen=sizeof(ostype); return 0;
+        }
+        if (name[1]==2) { /* kern.osrelease */
+            static const char osrelease[]="9.0-RELEASE";
+            if (!oldlen) return fail_posix(EINVAL);
+            if (old) {
+                if (*oldlen<sizeof(osrelease)) return fail_posix(ENOMEM);
+                memcpy(old,osrelease,sizeof(osrelease));
+            }
+            *oldlen=sizeof(osrelease); return 0;
+        }
     }
-    if (name[0]==6 && (name[1]==7 || name[1]==3)) { /* hw.pagesize / hw.ncpu */
-        if (!oldlen) return fail_posix(EINVAL);
-        int32_t value=name[1]==7 ? PAGE : 7;
-        if (old) { if (*oldlen<4) return fail_posix(ENOMEM); memcpy(old,&value,4); }
-        *oldlen=4; return 0;
+    /* CTL_HW */
+    if (name[0]==6) {
+        if (name[1]==7 || name[1]==3 || name[1]==4 || name[1]==8) { /* hw.pagesize / hw.ncpu / hw.byteorder / hw.floatingpoint */
+            if (!oldlen) return fail_posix(EINVAL);
+            int32_t value=name[1]==7 ? PAGE : name[1]==3 ? 7 : name[1]==4 ? 1234 : 1;
+            if (old) { if (*oldlen<4) return fail_posix(ENOMEM); memcpy(old,&value,4); }
+            *oldlen=4; return 0;
+        }
+        if (name[1]==5 || name[1]==6 || name[1]==10) { /* hw.physmem / hw.usermem / hw.realmem (8 GiB) */
+            if (!oldlen) return fail_posix(EINVAL);
+            uint64_t mem=UINT64_C(8)*1024*1024*1024;
+            if (old) {
+                if (*oldlen>=8) { memcpy(old,&mem,8); *oldlen=8; }
+                else if (*oldlen>=4) { uint32_t mem32=(uint32_t)(mem>UINT32_MAX ? UINT32_MAX : mem); memcpy(old,&mem32,4); *oldlen=4; }
+                else return fail_posix(ENOMEM);
+            } else {
+                *oldlen=8;
+            }
+            return 0;
+        }
     }
-    fprintf(stderr,"STOP: unsupported sysctl mib");
+    fprintf(stderr,"Runtime: unsupported sysctl mib");
     for (uint32_t i=0;i<namelen && i<8;++i) fprintf(stderr," %d",name[i]);
     fputc('\n',stderr);
-    exit(21);
+    return fail_posix(ENOENT);
 }
 
 /* ---- pthread_once and thread-specific data ---- */

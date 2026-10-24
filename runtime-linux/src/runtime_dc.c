@@ -92,10 +92,11 @@ static ABI int32_t posix_sem_init(HostSem **sem, int32_t shared, uint32_t value)
 }
 static ABI int32_t posix_sem_destroy(HostSem **sem) {
     if (!sem || !*sem) return -1;
-    pthread_mutex_destroy(&(*sem)->lock);
-    pthread_cond_destroy(&(*sem)->cond);
-    free(*sem);
+    HostSem *s = *sem;
     *sem = NULL;
+    pthread_mutex_destroy(&s->lock);
+    pthread_cond_destroy(&s->cond);
+    free(s);
     return 0;
 }
 static ABI int32_t posix_sem_wait(HostSem **sem) {
@@ -171,13 +172,16 @@ static ABI int32_t posix_rwlock_init(DcRwlock **handle, const void *attr) {
     return rwlock(handle) ? 0 : POSIX_EINVAL;
 }
 static ABI int32_t posix_rwlock_destroy(DcRwlock **handle) {
-    if (!handle || !*handle) return 0;
+    if (!handle) return 0;
+    pthread_mutex_lock(&rwlock_init_lock);
     DcRwlock *l = *handle;
+    *handle = NULL;
+    pthread_mutex_unlock(&rwlock_init_lock);
+    if (!l) return 0;
     pthread_cond_destroy(&l->readers_cv);
     pthread_cond_destroy(&l->writers_cv);
     pthread_mutex_destroy(&l->m);
     free(l);
-    *handle = NULL;
     return 0;
 }
 static int32_t rw_read(DcRwlock **h, int attempt) {
@@ -289,7 +293,7 @@ static ABI int32_t image_memory_size(void) { return 64 * 1024; }
 
 /* --- Misc services ----------------------------------------------------------------------- */
 static ABI int32_t safe_area(float *info) {
-    if (info) { info[0] = 1.0f; memset(info + 1, 0, 128 - sizeof(float)); }
+    if (info) *info = 1.0f;
     return 0;
 }
 static ABI int32_t save_mount_info(const void *mount_point, uint64_t *info) {
