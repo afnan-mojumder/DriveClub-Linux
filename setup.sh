@@ -309,6 +309,7 @@ language = 1
 window_size = 1920x1080
 fullscreen = 0
 fps = 60
+readbacks = 2
 threaded_recording = 0
 upscaler = none
 dc_upscale = 0

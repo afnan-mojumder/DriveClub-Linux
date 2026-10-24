@@ -19,6 +19,8 @@
 /* The user folder add-ons are listed from (runtime_file.c in the game): a temporary one here. */
 static char user_dir[512];
 const char *runtime_file_user_dir(void) { return user_dir; }
+const char *runtime_file_app_dir(void) { return user_dir; }
+int runtime_file_mount(const char *guest, const char *host) { (void)guest; (void)host; return 0; }
 static const char *const test_dirs[]={"addcont/CUSA00900/SPEXPANSIONDLC03","addcont/CUSA00900","addcont",
                                      "dlc/SPEXPANSIONDLC03","dlc/SPDLCMESSENGER00","dlc",""};
 static void remove_test_dirs(void) {

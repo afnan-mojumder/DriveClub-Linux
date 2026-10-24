@@ -122,8 +122,14 @@ static uint32_t scan_all(char labels[][LABEL_SIZE]) {
 static char cached_labels[MAX_ADDONS][LABEL_SIZE];
 static uint32_t cached_count;
 static int cached;
+static char last_dlc_env[512];
 static uint32_t collect_labels(char labels[][LABEL_SIZE]) {
-    if (!cached) { cached_count=scan_all(cached_labels); cached=1; }
+    const char *dlc = getenv("BB_DLC_DIR");
+    if (!cached || strcmp(last_dlc_env, dlc ? dlc : "")) {
+        snprintf(last_dlc_env, sizeof(last_dlc_env), "%s", dlc ? dlc : "");
+        cached_count = scan_all(cached_labels);
+        cached = 1;
+    }
     memcpy(labels,cached_labels,(size_t)cached_count*LABEL_SIZE);
     return cached_count;
 }

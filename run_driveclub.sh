@@ -35,6 +35,10 @@ while [[ $# -gt 0 ]]; do
             export BB_WINDOW_SIZE="$2"
             shift 2
             ;;
+        --readbacks)
+            export BB_READBACKS="$2"
+            shift 2
+            ;;
         -h|--help)
             SHOW_HELP=1
             shift
@@ -55,12 +59,14 @@ if [[ "$SHOW_HELP" == "1" ]]; then
     echo "  -w, --windowed          Run in windowed mode (default)"
     echo "  --fps <limit>           Set maximum framerate target (e.g., 30, 60, 120)"
     echo "  --res <WxH>             Set window resolution (e.g., 1920x1080, 1280x720, 2560x1440)"
+    echo "  --readbacks <mode>      GPU readback mode (0=Disabled, 1=Relaxed, 2=Precise [default: 2])"
     echo "  -h, --help              Show this help message"
     echo ""
     echo "Environment Overrides:"
     echo "  BB_FPS_LIMIT            Target framerate cap (default: 60)"
     echo "  BB_FULLSCREEN           1 for fullscreen, 0 for windowed (default: 0)"
     echo "  BB_WINDOW_SIZE          Window dimensions (default: 1920x1080)"
+    echo "  BB_READBACKS            GPU readbacks: 0=Disabled, 1=Relaxed, 2=Precise (default: 2)"
     echo "  BB_USER_NAME            In-game player name (default: Player)"
     echo "  DC_LANGUAGE             PS4 language code (1=English, 2=French, 4=German, etc.)"
     exit 0
@@ -104,7 +110,7 @@ export LD_LIBRARY_PATH="$GPU_LIB_DIR:${LD_LIBRARY_PATH:-}"
 export BB_GPU_USER_DIR="$DATA_DIR/user"
 export BB_CONFIG="${BB_CONFIG:-$DATA_DIR/dcport.ini}"
 export BB_LENIENT_IMPORTS=1
-export BB_READBACKS=0
+export BB_READBACKS="${BB_READBACKS:-2}"
 export BB_DRAW_PIPE=1
 export BB_DMEM_MB=${BB_DMEM_MB:-8192}
 export BB_USER_NAME="${BB_USER_NAME:-Player}"

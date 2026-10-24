@@ -133,8 +133,10 @@ GPU frontend ── PM4 packet processor, register state, GCN shaders -> SPIR-V
 
 ### Performance & Visual Consistency Principles
 1. **Synchronous Preparation (`BB_PREP_WORKERS=0`):** Driveclub dynamically modifies vertex buffers during draw generation. Running worker threads causes out-of-order execution leading to exploded car meshes and artifacting. Zero prep workers ensures 100% visual stability.
-2. **Decoupled Virtual Vblank (`BB_VBLANK_HZ=0`):** The engine's default 60 Hz vblank timer forces any frame that slightly exceeds 16.6 ms to wait for the next refresh tick (33.3 ms = 30 FPS). The Linux port engages a virtual 480 Hz timer (~2 ms granularity) paired with `BB_FPS_LIMIT=60`, preserving fluid 60 FPS even during heavy weather effects.
-3. **Pure Native Shading:** Eliminates external upscaler buffer conflicts for clean, crisp native PS4 visual fidelity.
+2. **Subgroup Memory Barriers (Zero White Squares):** GCN wavefronts share Local Data Share (LDS) memory in lockstep without explicit barriers. The shader recompiler incorporates subgroup scoped memory barriers between shared memory dependencies (backported from PR #5285), eliminating the classic "white square" / checkerboard artifact on modern GPU compilers.
+3. **Precise GPU Readbacks (`BB_READBACKS=2`):** Enables accurate GPU-to-CPU buffer synchronization, ensuring dynamic track exposure and lighting calculations resolve correctly without pitch-black or unshaded tiles.
+4. **Decoupled Virtual Vblank (`BB_VBLANK_HZ=0`):** The engine's default 60 Hz vblank timer forces any frame that slightly exceeds 16.6 ms to wait for the next refresh tick (33.3 ms = 30 FPS). The Linux port engages a virtual 480 Hz timer (~2 ms granularity) paired with `BB_FPS_LIMIT=60`, preserving fluid 60 FPS even during heavy weather effects.
+5. **Pure Native Shading:** Eliminates external upscaler buffer conflicts for clean, crisp native PS4 visual fidelity.
 
 ---
 
