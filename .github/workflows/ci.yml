@@ -38,3 +38,22 @@ jobs:
         run: python -m pip install pillow pytest
       - name: Tests
         run: python -m pytest
+
+  # Linux backend: runtime-linux/ (Native Vulkan renderer + HLE runtime).
+  linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake ninja-build pkg-config \
+            libvulkan-dev libsdl3-dev libfreetype-dev libboost-dev glslang-tools \
+            libx11-dev libxxhash-dev
+      - name: Build & Test Linux Runtime
+        run: |
+          cd runtime-linux
+          bash build.sh --test
+

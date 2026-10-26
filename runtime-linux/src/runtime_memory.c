@@ -280,11 +280,13 @@ static void queue_hook(int kind, uintptr_t address, uint64_t size) {
     }
     pending[pending_count++] = (PendingHook){kind, address, size};
 }
+static pthread_mutex_t flush_lock = PTHREAD_MUTEX_INITIALIZER;
 /* Runs queued GPU notifications; callers invoke it after dropping the lock. */
 static void flush_hooks(void) {
+    pthread_mutex_lock(&flush_lock);
     for (;;) {
         write_lock();
-        if (!pending_count) { write_unlock(); return; }
+        if (!pending_count) { write_unlock(); break; }
         PendingHook *batch = pending;
         size_t count = pending_count;
         pending = NULL;
@@ -298,6 +300,7 @@ static void flush_hooks(void) {
         }
         free(batch);
     }
+    pthread_mutex_unlock(&flush_lock);
 }
 static int flex_test(uint64_t page) { return (int)((flex_bitmap[page/64]>>(page%64))&1); }
 static void flex_set(uint64_t first, uint64_t count, int used) {

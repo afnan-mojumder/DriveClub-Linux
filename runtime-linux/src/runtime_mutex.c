@@ -20,7 +20,10 @@ static int32_t orbis_error(int e) {
     case EINVAL: code=22; break;
     case EAGAIN: code=35; break;
     case EDEADLK: code=11; break;
-    default: fprintf(stderr, "STOP: unmapped host pthread error %d\n", e); exit(21);
+    case ETIMEDOUT: code=60; break;
+    default:
+        fprintf(stderr, "Runtime: unmapped host pthread error %d\n", e);
+        return (int32_t)(UINT32_C(0x80020000) | (uint32_t)runtime_guest_errno(e));
     }
     return (int32_t)(UINT32_C(0x80020000) | code);
 }

@@ -369,6 +369,7 @@ static const RuntimeExport exports[] = {
     {"sceErrorDialogInitialize", ok}, {"sceErrorDialogTerminate", ok}, {"sceErrorDialogOpen", ok},
     {"sceErrorDialogClose", ok}, {"sceErrorDialogUpdateStatus", dialog_finished},
     {"sceMsgDialogClose", ok}, {"sceMsgDialogGetResult", dialog_result},
+    {"sceMsgDialogGetStatus", dialog_finished},
     {"sceSaveDataDialogClose", ok}, {"sceSaveDataDialogGetResult", dialog_result},
     {"sceSaveDataDialogIsReadyToDisplay", one}, {"sceSaveDataDialogProgressBarSetValue", ok},
     {"sceNpCommerceDialogGetResult", dialog_result}, {"sceNpCommerceDialogGetStatus", dialog_none},
@@ -383,6 +384,9 @@ static const RuntimeExport exports[] = {
 uintptr_t runtime_dc_resolve(const char *name) {
     uintptr_t found = runtime_font_resolve(name);
     if (!found) found = RUNTIME_LOOKUP(exports, name);
-    if (found) trace(runtime_symbol(name));
+    if (found) {
+        const char *sym = runtime_symbol(name);
+        trace(sym ? sym : name);
+    }
     return found;
 }

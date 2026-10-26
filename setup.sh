@@ -72,10 +72,12 @@ check_system() {
 
     # Detect Linux distribution
     DISTRO="unknown"
+    DISTRO_LIKE=""
     if [[ -f /etc/os-release ]]; then
         # shellcheck disable=SC1091
         source /etc/os-release
         DISTRO="${ID:-unknown}"
+        DISTRO_LIKE="${ID_LIKE:-}"
     fi
     success "System: Linux ($DISTRO) on $ARCH"
 }
@@ -88,16 +90,25 @@ check_dependencies() {
     MISSING_PKGS=()
 
     # Tools
-    for cmd in git python3 gcc cmake ninja pkg-config; do
+    for cmd in git python3 cmake ninja; do
         if ! command -v "$cmd" >/dev/null 2>&1; then
             MISSING_PKGS+=("$cmd")
         fi
     done
 
-    # Libraries via pkg-config
-    if command -v pkg-config >/dev/null 2>&1; then
+    # Compiler (gcc or clang)
+    if ! command -v gcc >/dev/null 2>&1 && ! command -v clang >/dev/null 2>&1 && ! command -v cc >/dev/null 2>&1; then
+        MISSING_PKGS+=("gcc/clang")
+    fi
+
+    # pkg-config or pkgconf
+    PKG_CONFIG="$(command -v pkg-config || command -v pkgconf || true)"
+    if [[ -z "$PKG_CONFIG" ]]; then
+        MISSING_PKGS+=("pkg-config")
+    else
+        # Libraries via pkg-config
         for lib in vulkan sdl3 freetype2; do
-            if ! pkg-config --exists "$lib" 2>/dev/null; then
+            if ! "$PKG_CONFIG" --exists "$lib" 2>/dev/null; then
                 MISSING_PKGS+=("lib:$lib")
             fi
         done
@@ -107,23 +118,19 @@ check_dependencies() {
         warn "Missing dependencies: ${MISSING_PKGS[*]}"
         echo ""
         echo -e "${YELLOW}Please install the required packages using your package manager:${NC}"
-        case "$DISTRO" in
-            arch|manjaro|endeavouros)
-                echo -e "  ${BOLD}sudo pacman -S --needed base-devel git cmake ninja clang pkgconf vulkan-headers vulkan-icd-loader sdl3 freetype2 boost${NC}"
-                ;;
-            ubuntu|debian|pop|linuxmint)
-                echo -e "  ${BOLD}sudo apt update && sudo apt install -y build-essential git cmake ninja-build clang pkg-config libvulkan-dev vulkan-tools libsdl3-dev libfreetype6-dev libboost-dev${NC}"
-                ;;
-            fedora|nobara|rhel)
-                echo -e "  ${BOLD}sudo dnf install -y @development-tools git cmake ninja-build clang pkgconf-pkg-config vulkan-loader-devel vulkan-headers SDL3-devel freetype-devel boost-devel${NC}"
-                ;;
-            steamos)
-                echo -e "  ${BOLD}On Steam Deck / SteamOS, disable read-only mode or use the development packages.${NC}"
-                ;;
-            *)
-                echo -e "  Install: git, cmake, ninja, clang/gcc, pkg-config, vulkan-headers, vulkan-loader, sdl3, freetype2, boost."
-                ;;
-        esac
+        if [[ "$DISTRO" =~ ^(arch|manjaro|endeavouros|garuda|cachyos|artix|omarchy)$ || "$DISTRO_LIKE" =~ arch ]]; then
+            echo -e "  ${BOLD}sudo pacman -S --needed base-devel git cmake ninja clang pkgconf vulkan-headers vulkan-icd-loader sdl3 freetype2 boost${NC}"
+        elif [[ "$DISTRO" =~ ^(ubuntu|debian|pop|linuxmint|elementary|zorin)$ || "$DISTRO_LIKE" =~ (debian|ubuntu) ]]; then
+            echo -e "  ${BOLD}sudo apt update && sudo apt install -y build-essential git cmake ninja-build clang pkg-config libvulkan-dev vulkan-tools libsdl3-dev libfreetype6-dev libboost-dev${NC}"
+        elif [[ "$DISTRO" =~ ^(fedora|nobara|rhel|centos|rocky|almalinux)$ || "$DISTRO_LIKE" =~ (fedora|rhel) ]]; then
+            echo -e "  ${BOLD}sudo dnf install -y @development-tools git cmake ninja-build clang pkgconf-pkg-config vulkan-loader-devel vulkan-headers SDL3-devel freetype-devel boost-devel${NC}"
+        elif [[ "$DISTRO" =~ ^(opensuse|suse) || "$DISTRO_LIKE" =~ suse ]]; then
+            echo -e "  ${BOLD}sudo zypper install -y git cmake ninja gcc-c++ clang pkg-config vulkan-headers libvulkan1 libSDL3-devel freetype2-devel boost-devel${NC}"
+        elif [[ "$DISTRO" == "steamos" ]]; then
+            echo -e "  ${BOLD}On Steam Deck / SteamOS, disable read-only mode or use the development packages.${NC}"
+        else
+            echo -e "  Install: git, cmake, ninja, clang/gcc, pkg-config, vulkan-headers, vulkan-loader, sdl3, freetype2, boost."
+        fi
         echo ""
 
         if [[ -f "$PROJECT_ROOT/runtime-linux/out/driveclub-probe" && -f "$PROJECT_ROOT/runtime-linux/out/gpu/libbbgpu.so" ]]; then
@@ -211,7 +218,7 @@ setup_game_files() {
         read -r -p "Path to game files: " SELECTED_PATH
     fi
 
-    SELECTED_PATH="$(eval echo "$SELECTED_PATH")" # expand ~ if present
+    SELECTED_PATH="${SELECTED_PATH/#\~/$HOME}" # safely expand ~ if present
 
     if [[ -z "$SELECTED_PATH" || ! -d "$SELECTED_PATH" ]]; then
         error "Invalid directory specified: '$SELECTED_PATH'"
@@ -375,11 +382,42 @@ EOF
 # ------------------------------------------------------------------------------
 main() {
     print_banner
+    local GAME_CLI_PATH=""
+    local FORCE_REBUILD="${REBUILD:-0}"
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -r|--rebuild)
+                FORCE_REBUILD=1
+                shift
+                ;;
+            --game-dir)
+                GAME_CLI_PATH="$2"
+                shift 2
+                ;;
+            -h|--help)
+                echo "Usage: ./setup.sh [options] [/path/to/game]"
+                echo ""
+                echo "Options:"
+                echo "  -r, --rebuild          Force rebuild of the native Linux runtime"
+                echo "  --game-dir <path>      Specify path to decrypted Driveclub PS4 game folder"
+                echo "  -h, --help             Show this help message"
+                exit 0
+                ;;
+            *)
+                if [[ -z "$GAME_CLI_PATH" && ! "$1" =~ ^- ]]; then
+                    GAME_CLI_PATH="$1"
+                fi
+                shift
+                ;;
+        esac
+    done
+
     check_system
     check_dependencies
     ensure_submodules
-    build_runtime "${REBUILD:-0}"
-    setup_game_files "${1:-}"
+    build_runtime "$FORCE_REBUILD"
+    setup_game_files "$GAME_CLI_PATH"
     prepare_assets
     configure_hardware
     create_desktop_launcher

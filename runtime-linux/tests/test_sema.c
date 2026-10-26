@@ -63,6 +63,10 @@ static void lifecycle(void) {
     assert(runtime_sema_waiters(s.handle)==0);
     assert(signal_sem(s.handle,1)==0 && poll_sem(s.handle,1)==0);
     assert(delete_sem(s.handle)==0);
+    uint32_t opt_sem = 0;
+    const uint32_t dummy_opt = 1;
+    assert(create(&opt_sem, "opt-test", 1, 0, 1, &dummy_opt) == 0);
+    assert(delete_sem(opt_sem) == 0);
 }
 typedef struct { uint32_t id; int32_t need,result; uint32_t timeout; } Task;
 static void *waiter(void *p) { Task *t=p; t->result=wait_sem(t->id,t->need,&t->timeout); return NULL; }

@@ -248,12 +248,39 @@ static ABI int32_t guest_sysctl(const int32_t *name,uint32_t namelen,void *old,u
             }
             *oldlen=sizeof(osrelease); return 0;
         }
+        if (name[1]==7) { /* kern.version */
+            static const char version[]="FreeBSD 9.0-RELEASE #0: Tue Jan  3 01:15:02 UTC 2012";
+            if (!oldlen) return fail_posix(EINVAL);
+            if (old) {
+                if (*oldlen<sizeof(version)) return fail_posix(ENOMEM);
+                memcpy(old,version,sizeof(version));
+            }
+            *oldlen=sizeof(version); return 0;
+        }
     }
     /* CTL_HW */
     if (name[0]==6) {
-        if (name[1]==7 || name[1]==3 || name[1]==4 || name[1]==8) { /* hw.pagesize / hw.ncpu / hw.byteorder / hw.floatingpoint */
+        if (name[1]==1) { /* hw.machine */
+            static const char machine[]="amd64";
             if (!oldlen) return fail_posix(EINVAL);
-            int32_t value=name[1]==7 ? PAGE : name[1]==3 ? 7 : name[1]==4 ? 1234 : 1;
+            if (old) {
+                if (*oldlen<sizeof(machine)) return fail_posix(ENOMEM);
+                memcpy(old,machine,sizeof(machine));
+            }
+            *oldlen=sizeof(machine); return 0;
+        }
+        if (name[1]==2) { /* hw.model */
+            static const char model[]="AMD Jaguar";
+            if (!oldlen) return fail_posix(EINVAL);
+            if (old) {
+                if (*oldlen<sizeof(model)) return fail_posix(ENOMEM);
+                memcpy(old,model,sizeof(model));
+            }
+            *oldlen=sizeof(model); return 0;
+        }
+        if (name[1]==7 || name[1]==3 || name[1]==4 || name[1]==8 || name[1]==9) { /* hw.pagesize / hw.ncpu / hw.byteorder / hw.floatingpoint / hw.ncpuonline */
+            if (!oldlen) return fail_posix(EINVAL);
+            int32_t value=name[1]==7 ? PAGE : (name[1]==3 || name[1]==9) ? 7 : name[1]==4 ? 1234 : 1;
             if (old) { if (*oldlen<4) return fail_posix(ENOMEM); memcpy(old,&value,4); }
             *oldlen=4; return 0;
         }

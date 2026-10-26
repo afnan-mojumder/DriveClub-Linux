@@ -36,9 +36,14 @@ if [[ -z ${PYTHON:-} ]]; then
     fi
 fi
 if [[ -z ${PYTHON:-} ]]; then echo 'Install Python 3 or set PYTHON.' >&2; exit 1; fi
-# BB_GAME_DIR: the game's folder (eboot.bin, sce_module, ...); default next to this directory.
-game=${BB_GAME_DIR:-../CUSA03173}
-if [[ ! -f $game/eboot.bin ]]; then echo "No eboot.bin in $game (set BB_GAME_DIR)." >&2; exit 1; fi
+# BB_GAME_DIR: the game's folder (eboot.bin, sce_module, ...); defaults to Driveclub.
+game=${BB_GAME_DIR:-${DC_GAME_DIR:-}}
+if [[ -z $game ]]; then
+    if [[ -f ../game/CUSA00003/eboot.bin ]]; then game=../game/CUSA00003
+    elif [[ -f ../game/CUSA00093/eboot.bin ]]; then game=../game/CUSA00093
+    else game=../CUSA03173; fi
+fi
+if [[ ! -f $game/eboot.bin ]]; then echo "No eboot.bin in $game (set BB_GAME_DIR or DC_GAME_DIR)." >&2; exit 1; fi
 original_game=$game
 game=$("$PYTHON" scripts/mods.py "$game" --out "$out" \
     --mods-dir "${BB_MODS_DIR:-$data/mods}" --config "${BB_MODS_CONFIG:-$data/mods.json}" \

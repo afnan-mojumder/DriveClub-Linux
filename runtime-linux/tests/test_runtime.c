@@ -361,6 +361,30 @@ static void audit_fixes_and_extensions(void) {
     assert(sysctl(mib_ostype, 2, ostype, &len, NULL, 0) == 0);
     assert(strcmp(ostype, "FreeBSD") == 0);
 
+    int32_t mib_machine[] = {6, 1};
+    char machine[32] = {0};
+    len = sizeof(machine);
+    assert(sysctl(mib_machine, 2, machine, &len, NULL, 0) == 0);
+    assert(strcmp(machine, "amd64") == 0);
+
+    int32_t mib_model[] = {6, 2};
+    char model[32] = {0};
+    len = sizeof(model);
+    assert(sysctl(mib_model, 2, model, &len, NULL, 0) == 0);
+    assert(strcmp(model, "AMD Jaguar") == 0);
+
+    int32_t mib_ncpuonline[] = {6, 9};
+    int32_t ncpuonline = 0;
+    len = sizeof(ncpuonline);
+    assert(sysctl(mib_ncpuonline, 2, &ncpuonline, &len, NULL, 0) == 0);
+    assert(ncpuonline == 7 && len == 4);
+
+    int32_t mib_version[] = {1, 7};
+    char version[128] = {0};
+    len = sizeof(version);
+    assert(sysctl(mib_version, 2, version, &len, NULL, 0) == 0);
+    assert(strstr(version, "FreeBSD") != NULL);
+
     int32_t mib_unknown[] = {99, 99};
     int32_t dummy = 0;
     len = sizeof(dummy);
@@ -401,6 +425,24 @@ static void audit_fixes_and_extensions(void) {
     assert(font_ret == 0);
     assert(font != NULL);
     if (close_font) close_font(font);
+
+    /* 5. rwlock non-default attribute handling */
+    typedef int32_t (ABI *RwInitFn)(void **, void *const *, const char *);
+    RwInitFn rw_init_fn = GET(RwInitFn, "6ULAa0fq4jA#p#J");
+    HandleOp rw_destroy_fn = GET(HandleOp, "BB+kb08Tl9A#p#J");
+    assert(rw_init_fn && rw_destroy_fn);
+    void *dummy_attr = (void *)0x1234;
+    void *const attr_ptr = dummy_attr;
+    void *rw_custom = NULL;
+    assert(rw_init_fn(&rw_custom, (void *const *)&attr_ptr, "custom-attr-test") == 0);
+    assert(rw_custom != NULL);
+    assert(rw_destroy_fn(&rw_custom) == 0);
+
+    /* 6. dialog and message stubs */
+    typedef int32_t (ABI *MsgDialogStatusFn)(void);
+    MsgDialogStatusFn msg_dialog_status = (MsgDialogStatusFn)runtime_resolve("sceMsgDialogGetStatus", 0);
+    assert(msg_dialog_status);
+    assert(msg_dialog_status() == 3);
 }
 int main(int argc,char **argv) {
     runtime_start(0); assert(runtime_resolve("bzQExy189ZI#q#q",0)==0);

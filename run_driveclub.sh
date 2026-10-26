@@ -17,6 +17,8 @@ GPU_LIB_DIR="$SCRIPT_DIR/runtime-linux/out/gpu"
 SHOW_HELP=0
 EXTRA_ARGS=()
 
+USE_GAMEMODE=0
+
 while [[ $# -gt 0 ]]; do
     case "$1" in
         -f|--fullscreen)
@@ -39,6 +41,14 @@ while [[ $# -gt 0 ]]; do
             export BB_READBACKS="$2"
             shift 2
             ;;
+        --gamemode)
+            USE_GAMEMODE=1
+            shift
+            ;;
+        --mangohud)
+            export MANGOHUD=1
+            shift
+            ;;
         -h|--help)
             SHOW_HELP=1
             shift
@@ -60,6 +70,8 @@ if [[ "$SHOW_HELP" == "1" ]]; then
     echo "  --fps <limit>           Set maximum framerate target (e.g., 30, 60, 120)"
     echo "  --res <WxH>             Set window resolution (e.g., 1920x1080, 1280x720, 2560x1440)"
     echo "  --readbacks <mode>      GPU readback mode (0=Disabled, 1=Relaxed, 2=Precise [default: 2])"
+    echo "  --gamemode              Launch with Feral GameMode (gamemoderun)"
+    echo "  --mangohud              Launch with MangoHud overlay enabled"
     echo "  -h, --help              Show this help message"
     echo ""
     echo "Environment Overrides:"
@@ -69,6 +81,7 @@ if [[ "$SHOW_HELP" == "1" ]]; then
     echo "  BB_READBACKS            GPU readbacks: 0=Disabled, 1=Relaxed, 2=Precise (default: 2)"
     echo "  BB_USER_NAME            In-game player name (default: Player)"
     echo "  DC_LANGUAGE             PS4 language code (1=English, 2=French, 4=German, etc.)"
+    echo "  GAMEMODE                Set to 1 to enable gamemoderun"
     exit 0
 fi
 
@@ -101,8 +114,9 @@ fi
 
 # Hardware Detection for Display
 GPU_INFO="Vulkan Host Device"
-if command -v lspci >/dev/null 2>&1; then
-    GPU_INFO="$(lspci | grep -i -E "vga|3d|display" | sed -E 's/.*: //; s/\(rev .*\)//' | head -n 1 || echo "Vulkan Host Device")"
+LSPCI_BIN="$(command -v lspci || command -v /usr/sbin/lspci || command -v /sbin/lspci || true)"
+if [[ -n "$LSPCI_BIN" ]]; then
+    GPU_INFO="$("$LSPCI_BIN" | grep -i -E "vga|3d|display" | sed -E 's/.*: //; s/\(rev .*\)//' | head -n 1 || echo "Vulkan Host Device")"
 fi
 
 # Environment configuration
@@ -147,6 +161,16 @@ export BB_WINDOW_SIZE="${BB_WINDOW_SIZE:-1920x1080}"
 export BB_VBLANK_HZ="${BB_VBLANK_HZ:-0}"
 export BB_FPS_LIMIT="${BB_FPS_LIMIT:-60}"
 
+LAUNCH_PREFIX=()
+if [[ "$USE_GAMEMODE" == "1" || "${GAMEMODE:-0}" == "1" ]]; then
+    if command -v gamemoderun >/dev/null 2>&1; then
+        LAUNCH_PREFIX=(gamemoderun)
+        echo " Performance: GameMode enabled (gamemoderun)"
+    else
+        echo " Performance: gamemoderun requested but not found in PATH; running normally" >&2
+    fi
+fi
+
 echo "=========================================================="
 echo " Starting Driveclub Native Linux Port (CUSA00003) "
 echo " Renderer: Native Vulkan on $GPU_INFO"
@@ -158,7 +182,7 @@ if [[ -f "$DATA_DIR/patches.bin" ]]; then
     PATCHES_ARG=(--patches "$DATA_DIR/patches.bin")
 fi
 
-exec "$PROBE_BIN" \
+exec ${LAUNCH_PREFIX[@]+"${LAUNCH_PREFIX[@]}"} "$PROBE_BIN" \
     "$DATA_DIR/boot-linked.bin" \
     --content-profile "$DATA_DIR/content.bin" \
     ${PATCHES_ARG[@]+"${PATCHES_ARG[@]}"} \

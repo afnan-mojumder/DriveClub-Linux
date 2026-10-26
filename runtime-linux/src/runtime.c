@@ -262,7 +262,7 @@ const char *runtime_symbol(const char *nid) {
  * libScePosix, so newer modules resolve by name through runtime_symbol. */
 uintptr_t runtime_lookup(const RuntimeExport *table,size_t count,const char *nid) {
     const char *symbol=runtime_symbol(nid);
-    if (!symbol) return 0;
+    if (!symbol) symbol=nid;
     for (size_t i=0;i<count;++i) if (!strcmp(symbol,table[i].name)) return (uintptr_t)table[i].function;
     return 0;
 }

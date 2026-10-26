@@ -140,7 +140,11 @@ static uint32_t collect_labels(char labels[][LABEL_SIZE]) {
  * at most capacity entries are written. Never touch unused list slots. */
 static ABI int32_t addon_list(uint32_t service,void *list,uint32_t capacity,uint32_t *hits) {
     require_initialized();
-    if (service) { fputs("STOP: nonzero AppContent service label unsupported\n",stderr); exit(21); }
+    if (service) {
+        printf("Runtime: nonzero AppContent service (%u) requested, reporting 0 add-ons\n", service);
+        if (hits) *hits = 0;
+        return 0;
+    }
     if ((!capacity || !list) && !hits) return PARAMETER;
     static char labels[MAX_ADDONS][LABEL_SIZE];
     uint32_t found=collect_labels(labels);
