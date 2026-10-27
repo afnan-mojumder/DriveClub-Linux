@@ -84,9 +84,13 @@ void UPnPClient::DiscoverThread() {
         return;
     }
 
+#if defined(MINIUPNPC_API_VERSION) && (MINIUPNPC_API_VERSION >= 18)
     char wan_addr[40]{};
     const int ret = UPNP_GetValidIGD(devlist, &m_urls, &m_data, m_lan_addr, sizeof(m_lan_addr),
                                      wan_addr, sizeof(wan_addr));
+#else
+    const int ret = UPNP_GetValidIGD(devlist, &m_urls, &m_data, m_lan_addr, sizeof(m_lan_addr));
+#endif
     freeUPNPDevlist(devlist);
 
     if (ret != 1) {
