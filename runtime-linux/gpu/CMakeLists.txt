@@ -172,7 +172,7 @@ add_dependencies(bbgpu host_shaders)
 # 529ceb3, with bbnet/vendor-changes.diff) and The Hunter's Dream backend (bbnet/thd, from
 # droogie's bbhost), as Awaken (Awakenchan/BloodBorneButPc) put them together.
 # See bbnet/SHADNET-PORT.md.
-find_package(Protobuf CONFIG REQUIRED)
+find_package(Protobuf REQUIRED)
 set(BBNET_VENDOR "${CMAKE_CURRENT_SOURCE_DIR}/bbnet/vendor/shadps4")
 set(SHADNET_PROTO_OUT "${CMAKE_CURRENT_BINARY_DIR}/shadnet_proto_gen")
 file(MAKE_DIRECTORY "${SHADNET_PROTO_OUT}")
