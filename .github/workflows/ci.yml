@@ -51,9 +51,10 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential cmake ninja-build pkg-config \
             libvulkan-dev libfreetype-dev libboost-dev glslang-tools \
-            libx11-dev libxxhash-dev
+            libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev \
+            libxinerama-dev libxkbcommon-dev libwayland-dev libxxhash-dev
           git clone --depth 1 https://github.com/libsdl-org/SDL.git -b release-3.4.18 /tmp/sdl3
-          cmake -S /tmp/sdl3 -B /tmp/sdl3/build -G Ninja -DCMAKE_BUILD_TYPE=Release -DSDL_TEST_LIBRARY=OFF -DCMAKE_INSTALL_PREFIX=/usr
+          cmake -S /tmp/sdl3 -B /tmp/sdl3/build -G Ninja -DCMAKE_BUILD_TYPE=Release -DSDL_TEST_LIBRARY=OFF -DSDL_UNIX_CONSOLE_BUILD=ON -DCMAKE_INSTALL_PREFIX=/usr
           sudo cmake --build /tmp/sdl3/build --target install
           sudo ldconfig
       - name: Build & Test Linux Runtime
