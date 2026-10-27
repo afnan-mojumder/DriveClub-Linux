@@ -187,6 +187,7 @@ Desktop.ini
 imgui.ini
 *.ini
 !/src/**/*.ini
+!/runtime-linux/tests/data/*.ini
 
 # ------------------------------------------------------------------------------
 # 9. IDEs & Editors
