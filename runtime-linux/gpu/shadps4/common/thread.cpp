@@ -32,6 +32,7 @@
 #endif
 #ifndef _WIN32
 #include <unistd.h>
+#include <sys/resource.h>
 #endif
 
 #ifdef __FreeBSD__
@@ -77,7 +78,13 @@ void SetCurrentThreadRealtime(const std::chrono::nanoseconds period_ns) {
 #else
 
 void SetCurrentThreadRealtime(const std::chrono::nanoseconds period_ns) {
-    // Not implemented
+#ifdef __linux__
+    struct sched_param param{};
+    param.sched_priority = 10;
+    if (pthread_setschedparam(pthread_self(), SCHED_RR, &param) != 0) {
+        setpriority(PRIO_PROCESS, 0, -10);
+    }
+#endif
 }
 
 #endif
@@ -158,7 +165,7 @@ bool AccurateSleep(const std::chrono::nanoseconds duration, std::chrono::nanosec
     };
     timespec remain;
     int ret;
-    while ((ret = nanosleep(&request, &remain)) < 0 && errno == EINTR) {
+    while ((ret = clock_nanosleep(CLOCK_MONOTONIC, 0, &request, &remain)) != 0 && ret == EINTR) {
         if (interruptible) {
             break;
         }
@@ -167,7 +174,7 @@ bool AccurateSleep(const std::chrono::nanoseconds duration, std::chrono::nanosec
     if (remaining) {
         *remaining = std::chrono::nanoseconds(remain.tv_sec * 1'000'000'000 + remain.tv_nsec);
     }
-    return ret == 0 || errno != EINTR;
+    return ret == 0 || ret != EINTR;
 }
 
 #endif
@@ -250,7 +257,14 @@ void PreciseSleepUntil(std::chrono::steady_clock::time_point deadline) {
             }
         }
 #else
-        std::this_thread::sleep_until(deadline - spin_margin);
+        const auto sleep_to = deadline - spin_margin;
+        const auto sec = duration_cast<seconds>(sleep_to.time_since_epoch());
+        const auto nsec = duration_cast<nanoseconds>(sleep_to.time_since_epoch() - sec);
+        const struct timespec ts = {
+            .tv_sec = static_cast<time_t>(sec.count()),
+            .tv_nsec = static_cast<long>(nsec.count()),
+        };
+        clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &ts, nullptr);
 #endif
     }
     while (steady_clock::now() < deadline) {

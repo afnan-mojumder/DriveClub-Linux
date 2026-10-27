@@ -2293,7 +2293,7 @@ bool TemporalUpscaler::RunDriveclub(const DcInputs& inputs) {
     done_this_frame = true;
     const int provider = BbSettings::Get().upscaler.load();
     if (failed || !Active() || provider == BbSettings::UpscalerTaa ||
-        provider == BbSettings::UpscalerDlss || !dc_depth || !dc_object_ids || !dc_color) {
+        !dc_depth || !dc_object_ids || !dc_color) {
         inactive += failed || !Active();
         no_depth += !dc_depth;
         no_ids += !dc_object_ids;
@@ -2456,7 +2456,14 @@ bool TemporalUpscaler::RunDriveclub(const DcInputs& inputs) {
     ++fg_handed;
 
     bool dispatched = false;
-    if (UseFsr4()) {
+    if (UseDlss()) {
+        dispatched = RecordDlss(cmdbuf,
+                                {color.GetImage(), color_view, color.info.pixel_format,
+                                 vk::ImageAspectFlagBits::eColor, w, h},
+                                {depth.GetImage(), depth_view, depth.info.pixel_format,
+                                 vk::ImageAspectFlagBits::eDepth, w, h},
+                                w, h, w, h, frame_ms, true);
+    } else if (UseFsr4()) {
         dispatched = RecordFsr4(cmdbuf, {color.GetImage(), color_view, w, h},
                                 {depth.GetImage(), depth_view, w, h}, w, h, w, h, frame_ms);
     } else {

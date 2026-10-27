@@ -208,6 +208,8 @@ void Swapchain::FindPresentMode() {
         present_mode = vk::PresentModeKHR::eMailbox;
     } else if (requested_mode == "Fifo") {
         present_mode = vk::PresentModeKHR::eFifo;
+    } else if (requested_mode == "FifoRelaxed" || requested_mode == "Fifo_Relaxed") {
+        present_mode = vk::PresentModeKHR::eFifoRelaxed;
     } else if (requested_mode == "Immediate") {
         present_mode = vk::PresentModeKHR::eImmediate;
     } else {

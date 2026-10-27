@@ -21,7 +21,7 @@ def test_every_name_is_in_the_xml():
 
 
 def test_default_session_is_the_60_fps_patch():
-    assert patches.patch_names(LauncherSettings()) == ["60 FPS with deltatime"]
+    assert patches.patch_names(LauncherSettings()) == ["60 FPS with fixed tickrate"]
     assert patches.dmem_mb(LauncherSettings()) == patches.DEFAULT_DMEM_MB
 
 
@@ -33,7 +33,7 @@ def test_30_fps_has_no_frame_rate_patch_but_keeps_toggles():
 def test_unknown_names_and_keys_are_ignored():
     s = LauncherSettings(patches=["Barrier Disable", "Run without sysmodules", "bogus"],
                          patch_timing="weird", render_res="16k")
-    assert patches.patch_names(s) == ["60 FPS with deltatime", "Barrier Disable"]
+    assert patches.patch_names(s) == ["60 FPS with fixed tickrate", "Barrier Disable"]
 
 
 def test_an_older_render_resolution_falls_back_to_1080p():

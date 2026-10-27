@@ -44,7 +44,7 @@ TIMING = {
     "deltatime": "60 FPS with deltatime",
     "fixed": "60 FPS with fixed tickrate",
 }
-DEFAULT_TIMING = "deltatime"
+DEFAULT_TIMING = "fixed"
 
 
 @dataclass(frozen=True)

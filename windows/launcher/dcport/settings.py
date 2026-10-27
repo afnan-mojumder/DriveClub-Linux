@@ -21,7 +21,7 @@ class LauncherSettings:
     render_res: str = "1080p"  # dcport.patches.RESOLUTIONS
     window_size: str = "1920x1080"  # windowed mode only
     patches: list = field(default_factory=list)  # names of dcport.patches.TOGGLES
-    patch_timing: str = "deltatime"  # dcport.patches.TIMING
+    patch_timing: str = "fixed"  # dcport.patches.TIMING
 
 
 def _valid(value, default) -> bool:

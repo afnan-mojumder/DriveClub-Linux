@@ -80,6 +80,29 @@ check_system() {
         DISTRO_LIKE="${ID_LIKE:-}"
     fi
     success "System: Linux ($DISTRO) on $ARCH"
+
+    # Check Linux kernel memory parameters
+    local map_count=0
+    if [[ -f /proc/sys/vm/max_map_count ]]; then
+        map_count="$(cat /proc/sys/vm/max_map_count 2>/dev/null || echo 0)"
+    elif command -v sysctl >/dev/null 2>&1; then
+        map_count="$(sysctl -n vm.max_map_count 2>/dev/null || echo 0)"
+    fi
+
+    if (( map_count > 0 && map_count < 2147483642 )); then
+        warn "vm.max_map_count is $map_count (recommended: 2147483642 for PS4 address space)."
+        info "To set permanently, run:"
+        echo -e "      ${BOLD}echo 'vm.max_map_count = 2147483642' | sudo tee /etc/sysctl.d/80-driveclub.conf && sudo sysctl --system${NC}"
+    else
+        success "Kernel parameter vm.max_map_count is optimal ($map_count)."
+    fi
+
+    # Check userfaultfd kernel support
+    if [[ -c /dev/userfaultfd || -f /proc/sys/vm/unprivileged_userfaultfd ]]; then
+        success "Kernel userfaultfd write tracking supported."
+    else
+        info "Kernel userfaultfd: write tracking will fallback to mprotect if not enabled."
+    fi
 }
 
 # ------------------------------------------------------------------------------
@@ -290,8 +313,8 @@ prepare_assets() {
         "$PROJECT_ROOT/game/CUSA00003" \
         "$PATCHES_XML" \
         "$DATA_DIR/patches.bin" \
-        "60 FPS with deltatime"
-    success "Patches compiled: 60 FPS with dynamic deltatime."
+        "60 FPS with fixed tickrate"
+    success "Patches compiled: 60 FPS with fixed tickrate."
 }
 
 # ------------------------------------------------------------------------------
@@ -301,32 +324,84 @@ configure_hardware() {
     info "Configuring hardware-optimized settings..."
     INI_FILE="$PROJECT_ROOT/data/dcport.ini"
 
-    # Detect GPU vendor
-    GPU_NAME="Generic GPU"
-    if command -v lspci >/dev/null 2>&1; then
-        GPU_NAME="$(lspci | grep -i -E "vga|3d|display" | head -n 1 || echo "Generic GPU")"
+    # 1. Detect Steam Deck vs Desktop
+    IS_STEAM_DECK=0
+    DMI_PRODUCT=""
+    DMI_VENDOR=""
+    if [[ -f /sys/devices/virtual/dmi/id/product_name ]]; then
+        DMI_PRODUCT="$(cat /sys/devices/virtual/dmi/id/product_name 2>/dev/null || true)"
     fi
-    info "Detected Graphics Device: $GPU_NAME"
+    if [[ -f /sys/devices/virtual/dmi/id/sys_vendor ]]; then
+        DMI_VENDOR="$(cat /sys/devices/virtual/dmi/id/sys_vendor 2>/dev/null || true)"
+    fi
+
+    if [[ "$DMI_PRODUCT" =~ ^(Jupiter|Galileo)$ || "$DMI_VENDOR" =~ ^Valve ]]; then
+        IS_STEAM_DECK=1
+        info "Steam Deck hardware detected ($DMI_PRODUCT)."
+        WINDOW_SIZE="1280x800"
+        TARGET_FPS="45"
+        TARGET_VBLANK="45"
+    else
+        WINDOW_SIZE="1920x1080"
+        TARGET_FPS="60"
+        TARGET_VBLANK="0"
+    fi
+
+    # 2. Detect CPU Topology (Intel Hybrid)
+    if [[ -f /sys/devices/cpu_core/cpus && -f /sys/devices/cpu_atom/cpus ]]; then
+        P_CORES="$(cat /sys/devices/cpu_core/cpus 2>/dev/null || true)"
+        info "Intel Hybrid CPU detected: launcher will automatically pin threads to P-Cores ($P_CORES)."
+    fi
+
+    # 3. Detect GPU vendor
+    GPU_NAME="Generic GPU"
+    GPU_VENDOR="unknown"
+    if command -v lspci >/dev/null 2>&1; then
+        GPU_NAME="$(lspci | grep -i -E "vga|3d|display" | sed -E 's/.*: //; s/\(rev .*\)//' | head -n 1 || echo "Generic GPU")"
+        pci_gpu="$(lspci -nn | grep -i -E "vga|3d|display" | head -n 1 || true)"
+        if [[ "$pci_gpu" =~ \[1002\] || "$pci_gpu" =~ [Aa][Mm][Dd]|[Rr]adeon ]]; then
+            GPU_VENDOR="amd"
+        elif [[ "$pci_gpu" =~ \[10de\] || "$pci_gpu" =~ [Nn][Vv][Ii][Dd][Ii][Aa] ]]; then
+            GPU_VENDOR="nvidia"
+        elif [[ "$pci_gpu" =~ \[8086\] || "$pci_gpu" =~ [Ii]ntel ]]; then
+            GPU_VENDOR="intel"
+        fi
+    fi
+    info "Detected Graphics Device: $GPU_NAME ($GPU_VENDOR)"
+
+    case "$GPU_VENDOR" in
+        amd)
+            info "AMD Radeon optimization: RADV ACO performance flags (sam,csw,nggc) will be enabled at launch."
+            ;;
+        nvidia)
+            info "NVIDIA GeForce optimization: 10 GB persistent shader disk cache will be enabled at launch."
+            ;;
+        intel)
+            if [[ "$GPU_NAME" =~ (Arc|DG2|Alchemist|Battlemage) ]]; then
+                info "Intel Arc GPU detected. Resizable BAR (ReBAR) status will be monitored at launch."
+            fi
+            ;;
+    esac
 
     # Clean, artifact-free, high-performance default settings
     cat > "$INI_FILE" << EOF
 [settings]
 player_name = Player
 language = 1
-window_size = 1920x1080
+window_size = $WINDOW_SIZE
 fullscreen = 0
-fps = 60
-readbacks = 2
+fps = $TARGET_FPS
+readbacks = 1
 threaded_recording = 0
 upscaler = none
 dc_upscale = 0
-vblank_hz = 0
-fps_limit = 60
+vblank_hz = $TARGET_VBLANK
+fps_limit = $TARGET_FPS
 prep_workers = 0
 copy_gpu_buffers = 0
 object_motion = 0
 EOF
-    success "Configuration written to $INI_FILE"
+    success "Hardware-tailored configuration written to $INI_FILE"
 }
 
 # ------------------------------------------------------------------------------

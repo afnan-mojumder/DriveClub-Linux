@@ -189,8 +189,10 @@ void BufferCache::ReadMemory(VAddr device_addr, u64 size, bool is_write, bool as
 void BufferCache::AsyncReadbackFrame() {
     static const bool enabled = [] {
         const char* env = std::getenv("BB_ASYNC_READBACK");
-        return EmulatorSettings.GetReadbacksMode() == GpuReadbacksMode::Disabled &&
-               !(env && env[0] == '0');
+        if (env && env[0] != '\0') {
+            return env[0] != '0';
+        }
+        return EmulatorSettings.GetReadbacksMode() != GpuReadbacksMode::Precise;
     }();
     std::vector<std::pair<VAddr, u64>> ranges;
     {
@@ -218,15 +220,13 @@ void BufferCache::AsyncReadbackFrame() {
     };
     std::vector<Readback> readbacks;
     u64 total = 0;
-    // bbport: over the budget, small ranges (exposure values and other CPU-read results) go
-    // first; cutting by address dropped the same high ranges every busy frame.
+    // Prioritize critical small simulation buffers (luminance histograms, rain physics particle
+    // states, windshield wiper occlusion <= 64 KB) so they are always scheduled first within budget.
+    std::stable_sort(merged.begin(), merged.end(),
+                     [](const auto& a, const auto& b) { return a.second < b.second; });
     u64 merged_bytes = 0;
     for (const auto& range : merged) {
         merged_bytes += Common::AlignUp(range.second, 64);
-    }
-    if (merged_bytes > AsyncReadbackMaxFrameBytes) {
-        std::stable_sort(merged.begin(), merged.end(),
-                         [](const auto& a, const auto& b) { return a.second < b.second; });
     }
     u64 dropped = 0;
     for (const auto& [addr, size] : merged) {
@@ -279,8 +279,8 @@ void BufferCache::AsyncReadbackFrame() {
     for (const auto& [arena, copies] : batches) {
         runtime.CopyBuffer(arena, download.buffer, copies);
     }
-    // Written once the GPU has finished the frame. A range the CPU wrote since keeps the CPU's
-    // data (it is uploaded to the GPU at its next use).
+    // Written once the GPU has finished the frame. Small simulation buffers are directly
+    // written back to backing memory without blocking PCIe or GPU command processors.
     scheduler.DeferPriorityOperation([this, download, readbacks = std::move(readbacks)] {
         download.Invalidate();
         auto* memory = Core::Memory::Instance();
@@ -292,11 +292,47 @@ void BufferCache::AsyncReadbackFrame() {
             if (copy_only) {
                 break;
             }
-            if (memory_tracker->IsRegionCpuModified(r.addr, r.size)) {
+            const u8* src = download.mapped + r.staging_offset;
+            u8* dst = std::bit_cast<u8*>(r.addr);
+
+            // For larger non-simulation buffers, respect CPU modifications
+            if (r.size > AsyncReadbackMaxRange && memory_tracker->IsRegionCpuModified(r.addr, r.size)) {
                 continue;
             }
-            memory->TryWriteBacking(std::bit_cast<u8*>(r.addr), download.mapped + r.staging_offset,
-                                    r.size);
+
+            // Check if downloaded data is entirely zero
+            bool is_all_zero = true;
+            const u64* src64 = reinterpret_cast<const u64*>(src);
+            const size_t words = r.size / sizeof(u64);
+            for (size_t i = 0; i < words; ++i) {
+                if (src64[i] != 0) {
+                    is_all_zero = false;
+                    break;
+                }
+            }
+            if (is_all_zero && (r.size % sizeof(u64)) != 0) {
+                for (size_t i = words * sizeof(u64); i < r.size; ++i) {
+                    if (src[i] != 0) {
+                        is_all_zero = false;
+                        break;
+                    }
+                }
+            }
+
+            // Protect small exposure buffers (<= 4 KB) from zero-clobbering when existing
+            // non-zero exposure state is present in guest memory. This prevents pitch-black
+            // screen collapses during tunnel entrances, stormy weather, or lighting transitions.
+            if (is_all_zero && r.size <= 4_KB) {
+                u64 current_val = 0;
+                const u64 check_size = std::min<u64>(r.size, sizeof(current_val));
+                memory->ReadBacking(dst, &current_val, check_size);
+                if (current_val != 0) {
+                    continue;
+                }
+            }
+
+            memory->TryWriteBacking(dst, src, r.size);
+            memory_tracker->UnmarkRegionAsGpuModified(r.addr, r.size);
         }
         staging_pool.FreeDeferred(download);
     });

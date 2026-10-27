@@ -146,6 +146,9 @@ bool MemoryManager::TryWriteBacking(void* address, const void* data, u64 size) {
     BbWriteLog::Note(reinterpret_cast<uintptr_t>(address), data, size, BbWriteLog::Backing);
     return runtime_memory_write_backing(reinterpret_cast<uintptr_t>(address), data, size) != 0;
 }
+void MemoryManager::ReadBacking(void* address, void* data, u64 size) {
+    runtime_memory_read_backing(reinterpret_cast<uintptr_t>(address), data, size);
+}
 void AddressSpace::Protect(VAddr virtual_addr, u64 size, MemoryPermission perms) {
     BbStats::Timer timer{BbStats::t_protect};
     const u64 pages = (size + 4095) / 4096;

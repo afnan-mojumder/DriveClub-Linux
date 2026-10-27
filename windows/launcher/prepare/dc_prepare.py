@@ -26,7 +26,7 @@ import respell  # noqa: E402
 import stamp  # noqa: E402
 
 MODULES = ['libc.prx', 'libSceFios2.prx', '../libtbb.prx', '../logiWheel.prx', '../iksemelGNMm.prx']
-PATCHES = ['60 FPS with deltatime']
+PATCHES = ['60 FPS with fixed tickrate']
 KEEP = {'boot-linked.bin', 'content.bin', 'patches.bin', 'source.txt', 'prepare.log'}
 
 
