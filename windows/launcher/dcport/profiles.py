@@ -174,10 +174,10 @@ def recover(paths: AppPaths, active: str) -> "list[str]":
     try:
         source = _recover(paths, active)
         if source:
-            messages.append(f"Moved your saves back to user\savedata from {source}")
+            messages.append(f"Moved your saves back to user/savedata from {source}")
     except OSError as e:
         messages.append(f"Could not move your saves back ({_why(e)}); they are still in "
-                        f"profiles\{active} or user\.dcport-restore-*")
+                        f"profiles/{active} or user/.dcport-restore-*")
     messages += _preserve_leftovers(paths, active, datetime.now())
     return messages
 

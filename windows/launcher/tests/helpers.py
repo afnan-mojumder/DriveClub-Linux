@@ -50,8 +50,12 @@ def make_port(tmp_path, with_data: bool = True):
     paths.runtime.write_bytes(b"MZ runtime")
     paths.patches_xml.parent.mkdir(parents=True, exist_ok=True)
     paths.patches_xml.write_text(
-        '<Patch><Metadata Name="60 FPS with deltatime" AppVer="01.28"><PatchList>'
-        '<Line Type="bytes" Address="0x400010" Value="90"/></PatchList></Metadata></Patch>',
+        '<Patch>'
+        '<Metadata Name="60 FPS with fixed tickrate" AppVer="01.28"><PatchList>'
+        '<Line Type="bytes" Address="0x400010" Value="90"/></PatchList></Metadata>'
+        '<Metadata Name="60 FPS with deltatime" AppVer="01.28"><PatchList>'
+        '<Line Type="bytes" Address="0x400010" Value="90"/></PatchList></Metadata>'
+        '</Patch>',
         encoding="utf-8")
     paths.data.mkdir(parents=True, exist_ok=True)
     if with_data:
