@@ -164,6 +164,7 @@ const char *input_output_name(InputOutput out) {
 /* ---- Binding resolution for one input token ------------------------------------------ */
 
 static int ResolveInput(const char *token, InputBinding *out) {
+    memset(out, 0, sizeof(*out));
     int32_t v;
     if (EqualsCaseInsensitive(token, "unmapped")) { out->kind = IN_NONE; return 1; }
     if (LOOKUP(kKeyNames, token, &v)) {
@@ -438,7 +439,7 @@ static void ParseLine(ParseState *state, char *line) {
         ++cfg->warnings;
         return;
     }
-    InputBinding binding;
+    InputBinding binding = {0};
     if (!ResolveInput(input_raw, &binding)) { ++cfg->warnings; return; }
     if (binding.kind == IN_NONE) return; /* "unmapped": explicitly no binding, not a warning */
 
