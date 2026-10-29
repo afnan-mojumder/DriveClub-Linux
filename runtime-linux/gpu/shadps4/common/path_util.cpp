@@ -87,24 +87,30 @@ static std::optional<std::filesystem::path> GetBundleParentDirectory() {
 static auto UserPaths = [] {
     // bbport: the port keeps GPU caches where BB_GPU_USER_DIR points.
     const char* port_dir = std::getenv("BB_GPU_USER_DIR");
-    auto user_dir = port_dir ? std::filesystem::path(port_dir) : std::filesystem::current_path() / PORTABLE_DIR;
-    if (!std::filesystem::exists(user_dir)) {
+    std::error_code ec;
+    auto user_dir = port_dir ? std::filesystem::path(port_dir) : std::filesystem::current_path(ec) / PORTABLE_DIR;
+    if (!port_dir && !std::filesystem::exists(user_dir)) {
         // If it doesn't exist, use the standard path for the platform instead.
         // NOTE: On Windows we currently just create the portable directory instead.
 #ifdef __APPLE__
-        user_dir =
-            std::filesystem::path(getenv("HOME")) / "Library" / "Application Support" / "shadPS4";
+        const char* home = getenv("HOME");
+        if (home != nullptr && strlen(home) > 0) {
+            user_dir = std::filesystem::path(home) / "Library" / "Application Support" / "shadPS4";
+        }
 #elif defined(__linux__)
         const char* xdg_data_home = getenv("XDG_DATA_HOME");
         if (xdg_data_home != nullptr && strlen(xdg_data_home) > 0) {
             user_dir = std::filesystem::path(xdg_data_home) / "shadPS4";
         } else {
-            user_dir = std::filesystem::path(getenv("HOME")) / ".local" / "share" / "shadPS4";
+            const char* home = getenv("HOME");
+            if (home != nullptr && strlen(home) > 0) {
+                user_dir = std::filesystem::path(home) / ".local" / "share" / "shadPS4";
+            }
         }
 #elif _WIN32
         // bbport: never shadPS4's %APPDATA% folder (an installed shadPS4 owns it); this runs
         // before main, so the portable folder is created here (run.py sets BB_GPU_USER_DIR).
-        std::filesystem::create_directories(user_dir);
+        std::filesystem::create_directories(user_dir, ec);
 #endif
     }
 

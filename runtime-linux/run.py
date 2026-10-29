@@ -209,7 +209,7 @@ def main():
     # (before the ultrawide one, which builds on its menu movies).
     text_layer = out / 'quit_text'
     shutil.rmtree(text_layer, ignore_errors=True)
-    if ini_value(config, 'quit_to_desktop') != '0' and (game_app_version(game) in (None, '01.09') or env.get('BB_FORCE_PATCHES')):
+    if ini_value(config, 'quit_to_desktop') != '0' and (game_app_version(game) in (None, '01.09') or env.get('BB_FORCE_PATCHES') == '1'):
         # Optional: when its files cannot be written ("[WinError 5] Access is denied", an
         # antivirus or the folder's permissions), the game starts without it.
         if not run_script('quit_menu.py', game, '--out', text_layer, optional=True):
@@ -223,7 +223,7 @@ def main():
     hud_layer = out / 'hud_layout'
     shutil.rmtree(hud_layer, ignore_errors=True)
     canvas = hud_canvas(output_size(read_settings(Path(config))))
-    if canvas != OUTPUT_SIZE and (game_app_version(game) in (None, '01.09') or env.get('BB_FORCE_PATCHES')):
+    if canvas != OUTPUT_SIZE and (game_app_version(game) in (None, '01.09') or env.get('BB_FORCE_PATCHES') == '1'):
         position = ini_value(config, 'hud_position') or '100'
         if not run_script('hud_layout.py', game, '--out', hud_layer, '--canvas-width', canvas[0],
                           '--position', max(0, min(100, int(position) if position.isdigit() else 100)) / 100,
@@ -265,7 +265,7 @@ def main():
         sys.path.insert(0, str(PORT / 'scripts'))
         from patches import eboot_matches_patches, game_app_version
         version = game_app_version(game)
-        forced = bool(env.get('BB_FORCE_PATCHES'))
+        forced = env.get('BB_FORCE_PATCHES') == '1'
         patched = version in (None, '01.09') or forced
         if not patched:
             print(f'Game version {version}: community patches need 01.09; 30 FPS, no effect patches')

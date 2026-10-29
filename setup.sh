@@ -277,7 +277,12 @@ setup_game_files() {
 
     if [[ "$(realpath "$TARGET_DIR")" != "$(realpath "$GAME_DIR" 2>/dev/null || true)" ]]; then
         info "Creating game link -> $GAME_DIR"
-        rm -rf "$GAME_DIR"
+        if [[ -L "$GAME_DIR" ]]; then
+            rm -f "$GAME_DIR"
+        elif [[ -d "$GAME_DIR" ]]; then
+            warn "Existing directory '$GAME_DIR' is not a symlink; backing it up to '${GAME_DIR}.bak'"
+            mv "$GAME_DIR" "${GAME_DIR}.bak"
+        fi
         ln -sfn "$(realpath "$TARGET_DIR")" "$GAME_DIR"
     fi
 
@@ -359,11 +364,11 @@ configure_hardware() {
     if command -v lspci >/dev/null 2>&1; then
         GPU_NAME="$(lspci | grep -i -E "vga|3d|display" | sed -E 's/.*: //; s/\(rev .*\)//' | head -n 1 || echo "Generic GPU")"
         pci_gpu="$(lspci -nn | grep -i -E "vga|3d|display" | head -n 1 || true)"
-        if [[ "$pci_gpu" =~ \[1002\] || "$pci_gpu" =~ [Aa][Mm][Dd]|[Rr]adeon ]]; then
+        if [[ "$pci_gpu" =~ \[1002: || "$pci_gpu" =~ [Aa][Mm][Dd]|[Rr]adeon ]]; then
             GPU_VENDOR="amd"
-        elif [[ "$pci_gpu" =~ \[10de\] || "$pci_gpu" =~ [Nn][Vv][Ii][Dd][Ii][Aa] ]]; then
+        elif [[ "$pci_gpu" =~ \[10de: || "$pci_gpu" =~ [Nn][Vv][Ii][Dd][Ii][Aa] ]]; then
             GPU_VENDOR="nvidia"
-        elif [[ "$pci_gpu" =~ \[8086\] || "$pci_gpu" =~ [Ii]ntel ]]; then
+        elif [[ "$pci_gpu" =~ \[8086: || "$pci_gpu" =~ [Ii]ntel ]]; then
             GPU_VENDOR="intel"
         fi
     fi
@@ -384,7 +389,8 @@ configure_hardware() {
     esac
 
     # Clean, artifact-free, high-performance default settings
-    cat > "$INI_FILE" << EOF
+    if [[ ! -f "$INI_FILE" ]]; then
+        cat > "$INI_FILE" << EOF
 [settings]
 player_name = Player
 language = 1
@@ -401,7 +407,10 @@ prep_workers = 0
 copy_gpu_buffers = 0
 object_motion = 0
 EOF
-    success "Hardware-tailored configuration written to $INI_FILE"
+        success "Hardware-tailored configuration written to $INI_FILE"
+    else
+        info "Existing configuration found at $INI_FILE (skipping overwrite)"
+    fi
 }
 
 # ------------------------------------------------------------------------------
@@ -428,7 +437,7 @@ Type=Application
 Name=DRIVECLUB
 GenericName=Racing Game
 Comment=Native Driveclub Linux Port
-Exec=$PROJECT_ROOT/run_driveclub.sh
+Exec="$PROJECT_ROOT/run_driveclub.sh"
 Icon=$ICON_DIR/driveclub.png
 Terminal=false
 Categories=Game;Simulation;

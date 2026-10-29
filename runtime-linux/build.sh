@@ -67,7 +67,7 @@ fi
 for patch in gpu/patches/fsr-vulkan/*.patch; do
     if git -C gpu/third_party/fsr-vulkan rev-parse --git-dir >/dev/null 2>&1; then
         if ! git -C gpu/third_party/fsr-vulkan apply --reverse --check "$PWD/$patch" 2>/dev/null; then
-            git -C gpu/third_party/fsr-vulkan apply "$PWD/$patch" 2>/dev/null || true
+            git -C gpu/third_party/fsr-vulkan apply "$PWD/$patch"
         fi
     fi
 done

@@ -244,11 +244,13 @@ static int pool(void) {
 #else
 /* Direct memory occupies [0,POOL_SIZE) of the memfd, flexible memory [POOL_SIZE,+FLEX_SPAN). */
 static int pool(void) {
-    if (pool_fd>=0) return 0;
-    pool_fd=memfd_create("bb-guest-memory", MFD_CLOEXEC);
-    if (pool_fd<0 || ftruncate(pool_fd,(off_t)(POOL_SIZE+FLEX_SPAN))) return -1;
-    void *view=mmap(NULL,POOL_SIZE+FLEX_SPAN,PROT_READ|PROT_WRITE,MAP_SHARED|MAP_NORESERVE,pool_fd,0);
-    if (view==MAP_FAILED) return -1;
+    if (backing_base) return 0;
+    int fd=memfd_create("bb-guest-memory", MFD_CLOEXEC);
+    if (fd<0) return -1;
+    if (ftruncate(fd,(off_t)(POOL_SIZE+FLEX_SPAN))) { close(fd); return -1; }
+    void *view=mmap(NULL,POOL_SIZE+FLEX_SPAN,PROT_READ|PROT_WRITE,MAP_SHARED|MAP_NORESERVE,fd,0);
+    if (view==MAP_FAILED) { close(fd); return -1; }
+    pool_fd=fd;
     backing_base=view;
     return 0;
 }
@@ -343,7 +345,7 @@ static int split_at(uintptr_t a) {
     if (i==vma_count || vmas[i].start>=a) return 0;
     Vma right=vmas[i];
     right.start=a;
-    if (right.kind==KIND_DIRECT) right.phys+=a-vmas[i].start;
+    if (right.kind!=KIND_RESERVED) right.phys+=a-vmas[i].start;
     vmas[i].end=a;
     return vma_insert(i+1,right);
 }
@@ -390,7 +392,7 @@ static int32_t place(void **inout, uint64_t size, int prot, int flags, uint64_t 
                      int kind, int type, uint64_t phys) {
     uintptr_t address=(uintptr_t)*inout;
     if (flags & MAP_FIXED_FLAG) {
-        if (!address || address%PAGE) return INVALID;
+        if (!address || address%PAGE || address < USER_MIN || size > USER_MAX - USER_MIN || address > USER_MAX - size) return INVALID;
         if ((flags & MAP_NO_OVERWRITE) && overlaps(address,address+size,1)) return NO_MEMORY;
     } else {
         address=find_free(address,size,alignment);
@@ -473,7 +475,7 @@ static ABI int32_t direct_map_named(void **out, uint64_t size, int prot, int fla
     (void)name; return direct_map(out,size,prot,flags,physical,alignment);
 }
 static int32_t unmap_locked(uintptr_t start, uint64_t size) {
-    if (start%PAGE || !size) return INVALID;
+    if (start%PAGE || !size || start < USER_MIN || size > USER_MAX - USER_MIN || start > USER_MAX - size) return INVALID;
     uint64_t end=start+align_up(size,PAGE);
     for (size_t i=vma_index(start); i<vma_count && vmas[i].start<end; ++i)
         if (vmas[i].kind!=KIND_RESERVED) {
@@ -508,7 +510,10 @@ static ABI int32_t direct_release(uint64_t start, uint64_t size) {
         uint64_t length=v.end-v.start;
         if (v.kind==KIND_DIRECT && v.phys<start+size && start<v.phys+length) {
             uint64_t a=v.phys>start ? v.phys : start, b=v.phys+length<start+size ? v.phys+length : start+size;
-            unmap_locked(v.start+(a-v.phys),b-a);
+            if (unmap_locked(v.start+(a-v.phys),b-a)) {
+                ++i;
+                continue;
+            }
             i=vma_index(v.start);
             continue;
         }
@@ -566,9 +571,14 @@ static ABI int32_t reserve_range(void **inout, uint64_t size, int flags, uint64_
     return result;
 }
 static int32_t protect_locked(uintptr_t start, uint64_t size, int prot, int type) {
-    uintptr_t end=start+align_up(size,PAGE);
-    start&=~(uintptr_t)(PAGE-1);
-    if ((prot & ~0x37) || !covered(start,end,0)) return INVALID;
+    if (!size || (prot & ~0x37)) return INVALID;
+    uintptr_t end_unaligned = start + size;
+    if (end_unaligned < start) return INVALID;
+    uintptr_t aligned_start = start & ~(uintptr_t)(PAGE - 1);
+    uintptr_t end = align_up(end_unaligned, PAGE);
+    if (end < end_unaligned || aligned_start < USER_MIN || end > USER_MAX) return INVALID;
+    start = aligned_start;
+    if (!covered(start,end,0)) return INVALID;
     if (host_protect(start,end-start,host_prot(prot))) return INVALID;
     int error; size_t i=carve(start,end,&error);
     if (error) return NO_MEMORY;

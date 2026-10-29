@@ -10,7 +10,10 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from prepare import sfo  # noqa: E402
+try:
+    from prepare import sfo  # noqa: E402
+except ImportError:
+    from prepare.prepare import sfo  # noqa: E402
 
 EBOOT_BASE = 0x400000
 APP_VERSION = '01.28'
@@ -30,7 +33,7 @@ def encode(line):
 
 
 def compile_patches(game, xml, out, names):
-    version = sfo((Path(game) / 'sce_sys/param.sfo').read_bytes()).get('APP_VER')
+    version = sfo((Path(game) / 'sce_sys/param.sfo').read_bytes()).get('APP_VER') if game else APP_VERSION
     writes = []
     if version != APP_VERSION:
         print(f'Patches: game version {version}, the community patches need {APP_VERSION}; none applied')
@@ -44,7 +47,7 @@ def compile_patches(game, xml, out, names):
         raise SystemExit(f'patches not found: {missing}')
     for name in names:
         for line in found[name].iter('Line'):
-            writes.append((int(line.get('Address'), 0) - EBOOT_BASE, encode(line)))
+            writes.append((int(line.get('Address'), 16) - EBOOT_BASE, encode(line)))
         print(f'Patch: {name}')
     blob = struct.pack('<8sQQ', b'BBPATCH2', EBOOT_BASE, len(writes))
     for offset, data in writes:

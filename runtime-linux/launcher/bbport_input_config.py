@@ -141,7 +141,7 @@ def input_ini_path(bbport_ini_path):
 # launcher starts from it too, or saving the Controls page before the first game start would
 # write only the edited lines, and the controller would then do nothing.
 DEFAULT_INPUT_INI = '''\
-# bbport input (shadPS4 syntax: output = input, one input per line).
+# DCport input (shadPS4 syntax: output = input, one input per line).
 # A shadPS4 input config (user/input_config/CUSA03173.ini) can be copied over this file.
 # F7 toggles the mouse, F8 reloads this file.
 

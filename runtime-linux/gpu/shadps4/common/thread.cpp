@@ -3,6 +3,9 @@
 // SPDX-FileCopyrightText: Copyright 2026 shadPS4 Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+#include <algorithm>
+#include <cerrno>
+#include <cstring>
 #include <ctime>
 #include <string>
 #include <thread>
@@ -145,7 +148,7 @@ void SetCurrentThreadPriority(ThreadPriority new_priority) {
     const auto scheduling_type = SCHED_OTHER;
     s32 max_prio = sched_get_priority_max(scheduling_type);
     s32 min_prio = sched_get_priority_min(scheduling_type);
-    u32 level = std::max(static_cast<u32>(new_priority) + 1, 4U);
+    u32 level = std::min(static_cast<u32>(new_priority) + 1, 4U);
 
     struct sched_param params;
     if (max_prio > min_prio) {
@@ -163,7 +166,7 @@ bool AccurateSleep(const std::chrono::nanoseconds duration, std::chrono::nanosec
         .tv_sec = duration.count() / 1'000'000'000,
         .tv_nsec = duration.count() % 1'000'000'000,
     };
-    timespec remain;
+    timespec remain{};
     int ret;
     while ((ret = clock_nanosleep(CLOCK_MONOTONIC, 0, &request, &remain)) != 0 && ret == EINTR) {
         if (interruptible) {

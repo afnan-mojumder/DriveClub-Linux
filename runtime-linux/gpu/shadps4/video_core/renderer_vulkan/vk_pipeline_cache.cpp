@@ -848,8 +848,13 @@ vk::ShaderModule PipelineCache::CompileModule(Shader::Info& info, Shader::Runtim
         }
     }
 
-    const auto ir_program = Shader::TranslateProgram(code, pools, info, runtime_info, profile);
-    auto spv = Shader::Backend::SPIRV::EmitSPIRV(profile, runtime_info, ir_program, binding);
+    auto stage_profile = profile;
+    if (info.hw_stage == Shader::HwStage::Compute && instance.IsSubgroupSize64Supported()) {
+        stage_profile.subgroup_size = 64;
+    }
+
+    const auto ir_program = Shader::TranslateProgram(code, pools, info, runtime_info, stage_profile);
+    auto spv = Shader::Backend::SPIRV::EmitSPIRV(stage_profile, runtime_info, ir_program, binding);
     DumpShader(spv, info.pgm_hash, info.hw_stage, perm_idx, "spv");
 
     vk::ShaderModule module;

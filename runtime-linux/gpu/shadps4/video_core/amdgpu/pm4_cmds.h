@@ -697,7 +697,13 @@ struct PM4CmdWaitRegMem {
     }
 
     bool Test(std::span<const u32> regs) const {
-        return TestValue(mem_space.Value() == MemSpace::Memory ? *Address() : regs[Reg()]);
+        if (mem_space.Value() == MemSpace::Memory) {
+            return Address() ? TestValue(*Address()) : true;
+        }
+        if (Reg() >= regs.size()) {
+            return true;
+        }
+        return TestValue(regs[Reg()]);
     }
 
     bool TestValue(u32 value) const {

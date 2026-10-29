@@ -77,7 +77,7 @@
               AppVer="01.28"
               AppElf="eboot.bin">
         <PatchList>
-            <Line Type="bytes" Address="00FD4149" Value="90909090909090"/>
+            <Line Type="bytes" Address="0x00FD4149" Value="90909090909090"/>
         </PatchList>
     </Metadata>
     <Metadata Title="Driveclub"
@@ -86,7 +86,7 @@
               Author="ZipperedRain" PatchVer="2.0"
               AppVer="01.28" AppElf="eboot.bin">
         <PatchList>
-            <Line Type="bytes" Address="00D75063" Value="909090909090"/>
+            <Line Type="bytes" Address="0x00D75063" Value="909090909090"/>
         </PatchList>
     </Metadata>
     <Metadata Title="Driveclub"

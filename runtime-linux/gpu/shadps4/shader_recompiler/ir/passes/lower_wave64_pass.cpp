@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: Copyright 2026 shadPS4 Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+#include <algorithm>
+#include <optional>
 #include "common/logging/classes.h"
 #include "shader_recompiler/info.h"
 #include "shader_recompiler/ir/basic_block.h"
@@ -89,6 +91,11 @@ void LowerWave64BallotPass(IR::Program& program, const RuntimeInfo& runtime_info
     if (program.info.hw_stage != HwStage::Compute || profile.subgroup_size == 64) {
         return;
     }
+    if (profile.subgroup_size != 32) {
+        LOG_WARNING(Render_Recompiler, "Unsupported subgroup size {} for wave64 lowering",
+                    profile.subgroup_size);
+        return;
+    }
 
     const auto [size_x, size_y, size_z] = runtime_info.hw.cs.workgroup_size;
     const u32 num_threads = size_x * size_y * size_z;
@@ -99,7 +106,7 @@ void LowerWave64BallotPass(IR::Program& program, const RuntimeInfo& runtime_info
     std::vector<IR::Inst*> worklist;
     const auto uniform_blocks = FindUniformBlocks(program);
     for (IR::Block* block : program.blocks) {
-        const bool is_uniform = std::ranges::contains(uniform_blocks, block);
+        const bool is_uniform = std::ranges::find(uniform_blocks, block) != uniform_blocks.end();
         const auto push_worklist = [&](IR::Inst& inst) {
             if (is_uniform) {
                 worklist.push_back(&inst);
@@ -130,7 +137,7 @@ void LowerWave64BallotPass(IR::Program& program, const RuntimeInfo& runtime_info
 
     const u32 scratch_base = Common::AlignUp(runtime_info.hw.cs.shared_memory_size, sizeof(u64));
     const u32 scratch_size =
-        (Common::AlignUp(num_threads, 64) / profile.subgroup_size) * sizeof(u32);
+        (Common::AlignUp(num_threads, 64) / 32) * sizeof(u32);
     program.info.shared_memory_scratch_size =
         scratch_base + scratch_size - runtime_info.hw.cs.shared_memory_size;
 
@@ -146,7 +153,11 @@ void LowerWave64BallotPass(IR::Program& program, const RuntimeInfo& runtime_info
                 ir.IAdd(ir.Imm32(scratch_base), ir.ShiftLeftLogical(subgroup_id, ir.Imm32(2u)));
             ir.WriteShared(32, mask_low, offset);
             ir.Barrier();
-            const IR::U64 mask = IR::U64{ir.LoadShared(64, false, offset)};
+            const IR::U32 wave_offset = ir.BitwiseAnd(offset, ir.Imm32(~7u));
+            const IR::U32 low = IR::U32{ir.LoadShared(32, false, wave_offset)};
+            const IR::U32 high =
+                IR::U32{ir.LoadShared(32, false, ir.IAdd(wave_offset, ir.Imm32(4u)))};
+            const IR::U64 mask = ir.PackUint2x32(ir.CompositeConstruct(low, high));
             ir.Barrier();
             inst->ReplaceUsesWithAndRemove(mask);
         } else if (inst->GetOpcode() == IR::Opcode::ReadLane) {

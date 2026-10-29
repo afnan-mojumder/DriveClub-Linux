@@ -293,11 +293,11 @@ done
 
 if [[ "$GPU_VENDOR" == "unknown" && -n "$LSPCI_BIN" ]]; then
     pci_gpu="$("$LSPCI_BIN" -nn | grep -i -E "vga|3d|display" | head -n 1 || true)"
-    if [[ "$pci_gpu" =~ \[1002\] || "$pci_gpu" =~ [Aa][Mm][Dd]|[Rr]adeon ]]; then
+    if [[ "$pci_gpu" =~ \[1002: || "$pci_gpu" =~ [Aa][Mm][Dd]|[Rr]adeon ]]; then
         GPU_VENDOR="amd"
-    elif [[ "$pci_gpu" =~ \[10de\] || "$pci_gpu" =~ [Nn][Vv][Ii][Dd][Ii][Aa] ]]; then
+    elif [[ "$pci_gpu" =~ \[10de: || "$pci_gpu" =~ [Nn][Vv][Ii][Dd][Ii][Aa] ]]; then
         GPU_VENDOR="nvidia"
-    elif [[ "$pci_gpu" =~ \[8086\] || "$pci_gpu" =~ [Ii]ntel ]]; then
+    elif [[ "$pci_gpu" =~ \[8086: || "$pci_gpu" =~ [Ii]ntel ]]; then
         GPU_VENDOR="intel"
     fi
 fi

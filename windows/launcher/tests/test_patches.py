@@ -45,3 +45,14 @@ def test_an_older_render_resolution_falls_back_to_1080p():
 def test_window_size():
     assert patches.window_size("2560x1440") == (2560, 1440)
     assert patches.window_size("1234x567") == (1920, 1080)
+
+
+def test_all_patches_in_xml_can_be_compiled(tmp_path):
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "prepare"))
+    import dc_patches
+    names = list(xml_names())
+    out_file = tmp_path / "patches.bin"
+    dc_patches.compile_patches(None, XML, out_file, names)
+    assert out_file.is_file()
+    assert out_file.stat().st_size > 0

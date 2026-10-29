@@ -81,5 +81,6 @@ jobs:
           mkdir -p ~/.local/share/shadPS4
           cd runtime-linux
           BB_LTO=OFF bash build.sh --test
+          python3 -m unittest discover -s tests -p "test_*.py"
 
 

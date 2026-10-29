@@ -257,7 +257,7 @@ def patch_sites(xml,app_version,names=FINGERPRINT_PATCHES):
     for meta in ET.parse(xml).getroot().iter('Metadata'):
         if meta.get('Name') not in names or meta.get('AppVer')!=app_version: continue
         for line in meta.iter('Line'):
-            offset=int(line.get('Address'),0)-EBOOT_BASE
+            offset=int(line.get('Address'),16)-EBOOT_BASE
             ranges.append((offset,offset+len(encode(line))))
     merged=[]
     for start,end in sorted(ranges):
@@ -301,7 +301,7 @@ def compile_patches(xml, names, app_version, segments):
     writes=[]
     for name in names:
         for line in found[name].iter('Line'):
-            offset=int(line.get('Address'),0)-EBOOT_BASE
+            offset=int(line.get('Address'),16)-EBOOT_BASE
             data=encode(line)
             if not any(start<=offset and offset+len(data)<=end for start,end in segments):
                 raise ValueError(f'{name}: address {line.get("Address")} is outside the eboot')
@@ -356,7 +356,7 @@ def compile_external(selected, segments):
         try:
             ours=[]
             for line in meta.iter('Line'):
-                offset=int(line.get('Address') or '',0)-EBOOT_BASE
+                offset=int(line.get('Address') or '0',16)-EBOOT_BASE
                 data=encode(line)
                 if not any(start<=offset and offset+len(data)<=end for start,end in segments):
                     raise ValueError(f'address {line.get("Address")} is outside the eboot')
@@ -407,7 +407,7 @@ def main():
     # The patches are byte writes at the addresses of one game version: on another version they
     # would corrupt code. Such a game runs unpatched (run.sh/run.py then choose 30 FPS).
     version=game_app_version(a.game_dir)
-    force=os.environ.get('BB_FORCE_PATCHES')
+    force=os.environ.get('BB_FORCE_PATCHES')=='1'
     if version and version!=a.app_version and not force:
         (a.out/'patches.bin').write_bytes(struct.pack('<8sQQ',b'BBPATCH2',EBOOT_BASE,0))
         print(f'Patches: game version {version}, patches are for {a.app_version}: none applied '

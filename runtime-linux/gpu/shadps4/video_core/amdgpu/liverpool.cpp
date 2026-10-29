@@ -425,8 +425,13 @@ Liverpool::Task Liverpool::ProcessCeUpdate(std::span<const u32> ccb) {
         }
         case PM4ItOpcode::WriteConstRam: {
             const auto* write_const = reinterpret_cast<const PM4WriteConstRam*>(header);
-            memcpy(cblock.constants_heap.data() + write_const->Offset(), &write_const->data,
-                   write_const->Size());
+            if (write_const->Offset() + write_const->Size() <= cblock.constants_heap.size()) {
+                memcpy(cblock.constants_heap.data() + write_const->Offset(), &write_const->data,
+                       write_const->Size());
+            } else {
+                LOG_ERROR(Render_Vulkan, "WriteConstRam out of bounds: offset {:#x}, size {:#x}",
+                          write_const->Offset(), write_const->Size());
+            }
             break;
         }
         case PM4ItOpcode::DumpConstRam: {
@@ -435,8 +440,15 @@ Liverpool::Task Liverpool::ProcessCeUpdate(std::span<const u32> ccb) {
                 rasterizer->DrainDrawPipe(Vulkan::DrawPipe::ReasonConstRam);
             }
             const auto* dump_const = reinterpret_cast<const PM4DumpConstRam*>(header);
-            memcpy(dump_const->Address<void*>(),
-                   cblock.constants_heap.data() + dump_const->Offset(), dump_const->Size());
+            if (dump_const->Offset() + dump_const->Size() <= cblock.constants_heap.size() &&
+                dump_const->Address<void*>() != nullptr &&
+                (!rasterizer || rasterizer->IsMapped(dump_const->Address<VAddr>(), dump_const->Size()))) {
+                memcpy(dump_const->Address<void*>(),
+                       cblock.constants_heap.data() + dump_const->Offset(), dump_const->Size());
+            } else {
+                LOG_ERROR(Render_Vulkan, "DumpConstRam out of bounds: offset {:#x}, size {:#x}, addr {:#x}",
+                          dump_const->Offset(), dump_const->Size(), dump_const->Address<VAddr>());
+            }
             break;
         }
         case PM4ItOpcode::IncrementCeCounter: {
@@ -508,16 +520,24 @@ void Liverpool::ApplyGraphicsRegisterPacket(Regs& regs, const PM4Header* header,
         break;
     case PM4ItOpcode::SetConfigReg: {
         const auto* set_data = reinterpret_cast<const PM4CmdSetData*>(header);
-        std::memcpy(&regs.reg_array[Regs::ConfigRegWordOffset + set_data->reg_offset], payload,
-                    (count - 1) * sizeof(u32));
-        mark(Regs::ConfigRegWordOffset + set_data->reg_offset, count - 1);
+        const u32 reg_idx = Regs::ConfigRegWordOffset + set_data->reg_offset;
+        if (count > 1 && reg_idx + (count - 1) <= Regs::NumRegs) {
+            std::memcpy(&regs.reg_array[reg_idx], payload, (count - 1) * sizeof(u32));
+            mark(reg_idx, count - 1);
+        } else {
+            LOG_ERROR(Render, "SetConfigReg out of bounds: offset {:#x}, count {}", set_data->reg_offset.Value(), count);
+        }
         break;
     }
     case PM4ItOpcode::SetContextReg: {
         const auto* set_data = reinterpret_cast<const PM4CmdSetData*>(header);
-        std::memcpy(&regs.reg_array[Regs::ContextRegWordOffset + set_data->reg_offset], payload,
-                    (count - 1) * sizeof(u32));
-        mark(Regs::ContextRegWordOffset + set_data->reg_offset, count - 1);
+        const u32 reg_idx = Regs::ContextRegWordOffset + set_data->reg_offset;
+        if (count > 1 && reg_idx + (count - 1) <= Regs::NumRegs) {
+            std::memcpy(&regs.reg_array[reg_idx], payload, (count - 1) * sizeof(u32));
+            mark(reg_idx, count - 1);
+        } else {
+            LOG_ERROR(Render, "SetContextReg out of bounds: offset {:#x}, count {}", set_data->reg_offset.Value(), count);
+        }
         break;
     }
     case PM4ItOpcode::SetShReg: {
@@ -525,17 +545,25 @@ void Liverpool::ApplyGraphicsRegisterPacket(Regs& regs, const PM4Header* header,
         // The compute program range goes to the queue's cs_state, not to regs.
         if (!(set_data->reg_offset >= 0x200 &&
               set_data->reg_offset <= (0x200 + sizeof(ComputeProgram) / 4))) {
-            std::memcpy(&regs.reg_array[Regs::ShRegWordOffset + set_data->reg_offset], payload,
-                        (count - 1) * sizeof(u32));
-            mark(Regs::ShRegWordOffset + set_data->reg_offset, count - 1);
+            const u32 reg_idx = Regs::ShRegWordOffset + set_data->reg_offset;
+            if (count > 1 && reg_idx + (count - 1) <= Regs::NumRegs) {
+                std::memcpy(&regs.reg_array[reg_idx], payload, (count - 1) * sizeof(u32));
+                mark(reg_idx, count - 1);
+            } else {
+                LOG_ERROR(Render, "SetShReg out of bounds: offset {:#x}, count {}", set_data->reg_offset.Value(), count);
+            }
         }
         break;
     }
     case PM4ItOpcode::SetUconfigReg: {
         const auto* set_data = reinterpret_cast<const PM4CmdSetData*>(header);
-        std::memcpy(&regs.reg_array[Regs::UconfigRegWordOffset + set_data->reg_offset], payload,
-                    (count - 1) * sizeof(u32));
-        mark(Regs::UconfigRegWordOffset + set_data->reg_offset, count - 1);
+        const u32 reg_idx = Regs::UconfigRegWordOffset + set_data->reg_offset;
+        if (count > 1 && reg_idx + (count - 1) <= Regs::NumRegs) {
+            std::memcpy(&regs.reg_array[reg_idx], payload, (count - 1) * sizeof(u32));
+            mark(reg_idx, count - 1);
+        } else {
+            LOG_ERROR(Render, "SetUconfigReg out of bounds: offset {:#x}, count {}", set_data->reg_offset.Value(), count);
+        }
         break;
     }
     case PM4ItOpcode::IndexType:
@@ -863,9 +891,11 @@ Liverpool::Task Liverpool::ProcessGraphics(std::span<const u32> dcb, std::span<c
 
                     const auto nop_offset = header->type3.count;
                     if (nop_offset == 0x0e || nop_offset == 0x0d || nop_offset == 0x0b) {
-                        ASSERT_MSG(payload[nop_offset] == 0xc0001000,
-                                   "NOP hint is missing in CB setup sequence");
-                        last_cb_extent[col_buf_id].raw = payload[nop_offset + 1];
+                        if (nop_offset + 1 < dcb.size() && payload[nop_offset] == 0xc0001000) {
+                            last_cb_extent[col_buf_id].raw = payload[nop_offset + 1];
+                        } else {
+                            last_cb_extent[col_buf_id].raw = 0;
+                        }
                     } else {
                         last_cb_extent[col_buf_id].raw = 0;
                     }
@@ -886,17 +916,21 @@ Liverpool::Task Liverpool::ProcessGraphics(std::span<const u32> dcb, std::span<c
 
                     const auto nop_offset = header->type3.count;
                     if (nop_offset == 0x04) {
-                        ASSERT_MSG(payload[nop_offset] == 0xc0001000,
-                                   "NOP hint is missing in CB setup sequence");
-                        last_cb_extent[col_buf_id].raw = payload[nop_offset + 1];
+                        if (nop_offset + 1 < dcb.size() && payload[nop_offset] == 0xc0001000) {
+                            last_cb_extent[col_buf_id].raw = payload[nop_offset + 1];
+                        } else {
+                            last_cb_extent[col_buf_id].raw = 0;
+                        }
                     }
                     break;
                 }
                 case ContextRegs::DbZInfo: {
                     if (header->type3.count == 8) {
-                        ASSERT_MSG(payload[20] == 0xc0001000,
-                                   "NOP hint is missing in DB setup sequence");
-                        last_db_extent.raw = payload[21];
+                        if (21 < dcb.size() && payload[20] == 0xc0001000) {
+                            last_db_extent.raw = payload[21];
+                        } else {
+                            last_db_extent.raw = 0;
+                        }
                     } else {
                         last_db_extent.raw = 0;
                     }
@@ -912,11 +946,15 @@ Liverpool::Task Liverpool::ProcessGraphics(std::span<const u32> dcb, std::span<c
                 const auto set_size = (count - 1) * sizeof(u32);
 
                 if (set_data->reg_offset >= 0x200 &&
-                    set_data->reg_offset <= (0x200 + sizeof(ComputeProgram) / 4)) {
-                    ASSERT(set_size <= sizeof(ComputeProgram));
-                    auto* addr = reinterpret_cast<u32*>(&mapped_queues[GfxQueueId].cs_state) +
-                                 (set_data->reg_offset - 0x200);
-                    std::memcpy(addr, header + 2, set_size);
+                    set_data->reg_offset < (0x200 + sizeof(ComputeProgram) / 4)) {
+                    if ((set_data->reg_offset - 0x200) * sizeof(u32) + set_size <= sizeof(ComputeProgram)) {
+                        auto* addr = reinterpret_cast<u32*>(&mapped_queues[GfxQueueId].cs_state) +
+                                     (set_data->reg_offset - 0x200);
+                        std::memcpy(addr, header + 2, set_size);
+                    } else {
+                        LOG_ERROR(Render, "SetShReg cs_state overflow: offset {:#x}, size {:#x}",
+                                  set_data->reg_offset.Value(), set_size);
+                    }
                 } // other SH registers: ApplyGraphicsRegisterPacket
                 break;
             }
@@ -1181,19 +1219,23 @@ Liverpool::Task Liverpool::ProcessGraphics(std::span<const u32> dcb, std::span<c
                 const auto* write_data = reinterpret_cast<const PM4CmdWriteData*>(header);
                 ASSERT(write_data->dst_sel.Value() == 2 || write_data->dst_sel.Value() == 5);
                 ASSERT(!write_data->wr_one_addr.Value());
+                if (header->type3.count.Value() < 2) {
+                    break;
+                }
+                const u32 write_bytes = (header->type3.count.Value() - 2) * sizeof(u32);
                 if (rasterizer) {
                     // In order with the draws (on the draw recording thread when in use).
                     BbWriteLog::NoteIntent(write_data->Address<u64>(), write_data->data,
-                                           (count - 2) * sizeof(u32),
+                                           write_bytes,
                                            BbWriteLog::WriteDataIntent);
                     if (rasterizer->RunInOrder(&RunWriteData, header, (count + 1) * sizeof(u32),
                                                BbToggle::PipelinedMemoryWrites)) {
-                        NotePendingWrite(*write_data, (count - 2) * sizeof(u32));
+                        NotePendingWrite(*write_data, write_bytes);
                         rasterizer->NotePendingGpuWrite(write_data->Address<VAddr>(),
-                                                        (count - 2) * sizeof(u32));
+                                                        write_bytes);
                     }
                 } else {
-                    std::memcpy(write_data->Address<u64*>(), write_data->data, (count - 2) * 4);
+                    std::memcpy(write_data->Address<u64*>(), write_data->data, write_bytes);
                 }
                 break;
             }
