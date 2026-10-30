@@ -85,7 +85,9 @@ void SetCurrentThreadRealtime(const std::chrono::nanoseconds period_ns) {
     struct sched_param param{};
     param.sched_priority = 10;
     if (pthread_setschedparam(pthread_self(), SCHED_RR, &param) != 0) {
-        setpriority(PRIO_PROCESS, 0, -10);
+        if (setpriority(PRIO_PROCESS, 0, -10) != 0) {
+            LOG_DEBUG(Common, "Could not set realtime (SCHED_RR) or nice priority (-10): {}", strerror(errno));
+        }
     }
 #endif
 }
@@ -175,7 +177,11 @@ bool AccurateSleep(const std::chrono::nanoseconds duration, std::chrono::nanosec
         request = remain;
     }
     if (remaining) {
-        *remaining = std::chrono::nanoseconds(remain.tv_sec * 1'000'000'000 + remain.tv_nsec);
+        if (ret == 0) {
+            *remaining = std::chrono::nanoseconds(0);
+        } else {
+            *remaining = std::chrono::nanoseconds(remain.tv_sec * 1'000'000'000 + remain.tv_nsec);
+        }
     }
     return ret == 0 || ret != EINTR;
 }

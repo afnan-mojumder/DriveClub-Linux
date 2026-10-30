@@ -651,13 +651,13 @@ def test_window_icon_for_taskbar(tmp_path):
 
 def test_window_position_from_environment(tmp_path, monkeypatch):
     monkeypatch.setenv("DCPORT_WINDOW_POS", "+-1840+60")
-    app = App(AppPaths.for_root(tmp_path), fsr=False)
+    app = _App(AppPaths.for_root(tmp_path), fsr=False)
     try:
         assert app.wm_geometry().endswith("+-1840+60")  # set before the window first shows
     finally:
         app.destroy()
     monkeypatch.setenv("DCPORT_WINDOW_POS", "somewhere")
-    app = App(AppPaths.for_root(tmp_path), fsr=False)
+    app = _App(AppPaths.for_root(tmp_path), fsr=False)
     try:
         assert re.search(r"\+\d+\+\d+$", app.wm_geometry())  # ignored: centred as usual
     finally:

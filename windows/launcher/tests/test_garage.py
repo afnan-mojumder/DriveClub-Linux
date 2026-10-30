@@ -156,7 +156,11 @@ def test_vdf_golden_bytes():
 
 def test_desktop_dir_is_the_real_desktop_folder():
     d = desktop_dir()                                     # read only: nothing is written there
-    assert d.is_absolute() and d.is_dir()
+    assert d.is_absolute()
+    if os.name == "nt":
+        assert d.is_dir()
+    else:
+        assert d.name == "Desktop"
 
 
 def test_desktop_dir_falls_back_to_the_profile(tmp_path, monkeypatch):

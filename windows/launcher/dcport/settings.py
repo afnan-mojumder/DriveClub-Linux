@@ -43,7 +43,7 @@ def load_settings(paths: AppPaths) -> LauncherSettings:
         except OSError:
             text = ""
         if text:
-            s.game_dir = str((paths.root / text).resolve())
+            s.game_dir = str((paths.root / text.replace("\\", "/")).resolve())
         return s
     except (OSError, ValueError):
         return s

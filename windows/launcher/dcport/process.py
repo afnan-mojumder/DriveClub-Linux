@@ -41,7 +41,7 @@ class GameRunner:
                     cmd, env=env, cwd=cwd,
                     stdin=subprocess.DEVNULL, stdout=log_file,
                     stderr=subprocess.STDOUT,
-                    creationflags=subprocess.CREATE_NO_WINDOW)
+                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
             except BaseException:
                 log_file.close()
                 raise
