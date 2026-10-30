@@ -23,6 +23,7 @@ from link_libc import encode_id
 from cpu_compat import atomic_output, patch_image, patch_libc
 
 DEFAULT_MODULES = ('libc.prx', 'libSceFios2.prx')
+OPTIONAL_MODULES = ('../dlcldr.prx',)
 FS_LOAD = bytes.fromhex('64488b042500000000')  # mov rax, fs:[0]
 RED_ZONE_SITES = Path(__file__).resolve().parent.parent / 'patches' / 'redzone.json'
 LEA_DOWN = bytes.fromhex('488d642480')        # lea rsp, [rsp-0x80]
@@ -165,7 +166,14 @@ def protect_image(image, segments, untranslated, relocs, path=RED_ZONE_SITES):
     return report
 
 
-def link(game, out, module_names=DEFAULT_MODULES):
+def modules(game, module_names=None):
+    if module_names is not None:
+        return list(module_names)
+    return list(DEFAULT_MODULES) + [m for m in OPTIONAL_MODULES if (Path(game) / 'sce_module' / m).is_file()]
+
+
+def link(game, out, module_names=None):
+    module_names = modules(game, module_names)
     main = module(game / 'eboot.bin')
     raw = (out / 'boot.bin').read_bytes()
     magic, size, entry, ns, nr, ni, flags = unpack('<8s6Q', raw, 0)
@@ -346,6 +354,6 @@ if __name__ == '__main__':
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('game', type=Path)
     p.add_argument('--out', type=Path, default=Path(__file__).resolve().parent.parent / 'out')
-    p.add_argument('--modules', nargs='*', default=list(DEFAULT_MODULES))
+    p.add_argument('--modules', nargs='*', default=None)
     a = p.parse_args()
     link(a.game, a.out, a.modules)
