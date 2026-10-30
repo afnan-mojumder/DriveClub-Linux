@@ -87,6 +87,7 @@ void runtime_audio_report(void);
 uintptr_t runtime_pad_resolve(const char *name);
 void runtime_pad_report(void);
 uintptr_t runtime_rtc_resolve(const char *name);
+ABI int32_t runtime_rtc_parse_rfc3339(uint64_t *tick, const char *str);
 const char *runtime_file_user_dir(void);
 const char *runtime_file_app_dir(void);
 ABI int32_t runtime_addcont_info(uint32_t service, const char *label, void *info);

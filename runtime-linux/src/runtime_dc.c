@@ -301,7 +301,6 @@ static ABI int32_t save_mount_info(const void *mount_point, uint64_t *info) {
     return 0;
 }
 static ABI int32_t audio_in_silent(void) { return 0; }
-static ABI int32_t rtc_parse_unsupported(void) { return (int32_t)0x80B50002; }
 
 static const RuntimeExport exports[] = {
     {"sceKernelSleep", kernel_sleep}, {"sceKernelGetdents", kernel_getdents},
@@ -378,7 +377,7 @@ static const RuntimeExport exports[] = {
     {"sceSystemServiceGetDisplaySafeAreaInfo", safe_area},
     {"sceSaveDataGetMountInfo", save_mount_info},
     {"sceAudioInGetSilentState", audio_in_silent},
-    {"sceRtcParseRFC3339", rtc_parse_unsupported},
+    {"sceRtcParseRFC3339", (void *)runtime_rtc_parse_rfc3339},
 };
 
 uintptr_t runtime_dc_resolve(const char *name) {

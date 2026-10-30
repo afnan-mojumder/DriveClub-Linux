@@ -144,6 +144,64 @@ static ABI int32_t rtc_rfc2822_local(char *out, const uint64_t *utc_tick) {
     return 0;
 }
 
+ABI int32_t runtime_rtc_parse_rfc3339(uint64_t *tick, const char *str) {
+    if (!tick || !str) return ERR_INVALID_POINTER;
+    int year = 0, month = 0, day = 0, hour = 0, minute = 0, second = 0;
+    int chars_read = 0;
+    if (sscanf(str, "%04d-%02d-%02d%*[T ]%02d:%02d:%02d%n",
+               &year, &month, &day, &hour, &minute, &second, &chars_read) < 6 || chars_read == 0) {
+        return (int32_t)0x80B50003; /* ERR_INVALID_VALUE */
+    }
+    const char *p = str + chars_read;
+    uint32_t microsecond = 0;
+    if (*p == '.') {
+        p++;
+        uint32_t fraction = 0;
+        int digits = 0;
+        while (*p >= '0' && *p <= '9') {
+            if (digits < 6) {
+                fraction = fraction * 10 + (uint32_t)(*p - '0');
+                digits++;
+            }
+            p++;
+        }
+        while (digits < 6) {
+            fraction *= 10;
+            digits++;
+        }
+        microsecond = fraction;
+    }
+    int64_t tz_offset_us = 0;
+    if (*p == 'Z' || *p == 'z') {
+        p++;
+    } else if (*p == '+' || *p == '-') {
+        char sign = *p++;
+        int tz_h = 0, tz_m = 0;
+        if (sscanf(p, "%02d:%02d", &tz_h, &tz_m) < 2 && sscanf(p, "%02d%02d", &tz_h, &tz_m) < 2) {
+            return (int32_t)0x80B50003;
+        }
+        int64_t total_mins = tz_h * 60 + tz_m;
+        tz_offset_us = (sign == '-' ? -total_mins : total_mins) * 60000000;
+    }
+    DateTime dt;
+    dt.year = (uint16_t)year;
+    dt.month = (uint16_t)month;
+    dt.day = (uint16_t)day;
+    dt.hour = (uint16_t)hour;
+    dt.minute = (uint16_t)minute;
+    dt.second = (uint16_t)second;
+    dt.microsecond = microsecond;
+    int32_t e = validate(&dt);
+    if (e) return e;
+    uint64_t local_tick = to_tick(&dt);
+    if (tz_offset_us > 0 && local_tick < (uint64_t)tz_offset_us) {
+        *tick = 0;
+    } else {
+        *tick = (uint64_t)((int64_t)local_tick - tz_offset_us);
+    }
+    return 0;
+}
+
 static const RuntimeExport exports[]={
     {"sceRtcGetCurrentClockLocalTime",rtc_current_local}, {"sceRtcGetCurrentClock",rtc_current_clock},
     {"sceRtcGetCurrentTick",rtc_current_tick}, {"sceRtcGetCurrentNetworkTick",rtc_current_tick},
@@ -151,5 +209,6 @@ static const RuntimeExport exports[]={
     {"sceRtcGetDayOfWeek",rtc_day_of_week}, {"sceRtcGetTick",rtc_get_tick}, {"sceRtcSetTick",rtc_set_tick},
     {"sceRtcGetTickResolution",rtc_tick_resolution}, {"sceRtcSetTime_t",rtc_set_time_t},
     {"sceRtcGetTime_t",rtc_get_time_t}, {"sceRtcFormatRFC2822LocalTime",rtc_rfc2822_local},
+    {"sceRtcParseRFC3339",runtime_rtc_parse_rfc3339},
 };
 uintptr_t runtime_rtc_resolve(const char *name) { return RUNTIME_LOOKUP(exports,name); }

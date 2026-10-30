@@ -443,6 +443,29 @@ static void audit_fixes_and_extensions(void) {
     MsgDialogStatusFn msg_dialog_status = (MsgDialogStatusFn)runtime_resolve("sceMsgDialogGetStatus", 0);
     assert(msg_dialog_status);
     assert(msg_dialog_status() == 3);
+
+    /* 7. sceRtcParseRFC3339 */
+    typedef int32_t (ABI *ParseRFC3339Fn)(uint64_t *tick, const char *str);
+    ParseRFC3339Fn parse = GET(ParseRFC3339Fn, "99bMGglFW3I");
+    if (!parse) parse = (ParseRFC3339Fn)runtime_resolve("sceRtcParseRFC3339", 0);
+    assert(parse != NULL);
+
+    uint64_t tick = 0;
+    assert(parse(NULL, "2026-10-30T22:10:34Z") == (int32_t)0x80B50002);
+    assert(parse(&tick, NULL) == (int32_t)0x80B50002);
+    assert(parse(&tick, "invalid-timestamp") == (int32_t)0x80B50003);
+    assert(parse(&tick, "2026-13-01T00:00:00Z") != 0);
+
+    assert(parse(&tick, "2026-10-30T20:00:00Z") == 0);
+    assert(tick > 0);
+
+    uint64_t tick_tz = 0;
+    assert(parse(&tick_tz, "2026-10-30T22:00:00+02:00") == 0);
+    assert(tick == tick_tz);
+
+    uint64_t tick_us = 0;
+    assert(parse(&tick_us, "2026-10-30T20:00:00.500000Z") == 0);
+    assert(tick_us == tick + 500000);
 }
 int main(int argc,char **argv) {
     runtime_start(0); assert(runtime_resolve("bzQExy189ZI#q#q",0)==0);
