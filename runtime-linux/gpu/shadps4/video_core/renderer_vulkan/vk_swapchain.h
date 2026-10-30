@@ -116,7 +116,7 @@ private:
     const Frontend::WindowSDL& window;
     vk::SwapchainKHR swapchain{};
     vk::SurfaceKHR surface{};
-    vk::SurfaceFormatKHR surface_format;
+    vk::SurfaceFormatKHR surface_format{};
     vk::Format view_format;
     vk::PresentModeKHR present_mode;
     vk::Extent2D extent;

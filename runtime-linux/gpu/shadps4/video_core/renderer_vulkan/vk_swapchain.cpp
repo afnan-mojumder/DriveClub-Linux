@@ -142,7 +142,8 @@ bool Swapchain::Present() {
     };
 
     auto result = instance.GetPresentQueue().presentKHR(present_info);
-    if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR) {
+    if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR ||
+        result == vk::Result::eErrorSurfaceLostKHR) {
         needs_recreation = true;
     } else {
         ASSERT_MSG(result == vk::Result::eSuccess, "Swapchain presentation failed: {}",
@@ -157,8 +158,8 @@ bool Swapchain::Present() {
 void Swapchain::FindPresentFormat() {
     const auto [formats_result, formats] =
         instance.GetPhysicalDevice().getSurfaceFormatsKHR(surface);
-    ASSERT_MSG(formats_result == vk::Result::eSuccess, "Failed to query surface formats: {}",
-               vk::to_string(formats_result));
+    ASSERT_MSG(formats_result == vk::Result::eSuccess && !formats.empty(),
+               "Failed to query surface formats: {}", vk::to_string(formats_result));
 
     // Check if the device supports HDR formats. Here we care of Rec.2020 PQ only as it is expected
     // game output. Other variants as e.g. linear Rec.2020 will require additional color space

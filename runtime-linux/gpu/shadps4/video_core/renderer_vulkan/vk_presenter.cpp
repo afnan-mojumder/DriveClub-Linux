@@ -667,12 +667,19 @@ void Presenter::Present(Frame* frame, bool is_reusing_frame, bool is_game_frame)
 }
 
 bool Presenter::PresentImage(Frame* frame, vk::Image src, bool last) {
+    if (window.GetWidth() == 0 || window.GetHeight() == 0) {
+        return false;
+    }
+
     // Recreate the swapchain if the window was resized.
     if (window.GetWidth() != swapchain.GetWidth() || window.GetHeight() != swapchain.GetHeight()) {
         swapchain.Recreate(window.GetWidth(), window.GetHeight());
     }
 
     if (!swapchain.AcquireNextImage()) {
+        if (window.GetWidth() == 0 || window.GetHeight() == 0) {
+            return false;
+        }
         swapchain.Recreate(window.GetWidth(), window.GetHeight());
         if (!swapchain.AcquireNextImage()) {
             // User resizes the window too fast and GPU can't keep up. Skip this frame.
